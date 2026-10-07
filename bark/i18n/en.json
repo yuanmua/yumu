@@ -1,0 +1,20 @@
+{
+  "error.IO": "Could not read or write {path}.",
+  "error.HTTP": "Could not reach {url}. Check your internet connection.",
+  "error.HTTP_STATUS": "The server at {url} answered with status {status}.",
+  "error.DOWNLOAD_HASH_MISMATCH": "A downloaded file was corrupted and will be retried.",
+  "error.INVALID_JSON": "Received unreadable data from {from}.",
+  "error.INVALID_TOML": "The file {path} is not valid.",
+  "error.MALFORMED_DATA": "Unexpected data: {detail}.",
+  "error.VERSION_NOT_FOUND": "Minecraft {version} does not exist.",
+  "error.INSTANCE_NOT_FOUND": "There is no instance named {id}.",
+  "error.INSTANCE_EXISTS": "An instance named {id} already exists.",
+  "error.INSTANCE_EDITION_UNSUPPORTED": "This version of Yumu cannot run {edition} instances.",
+  "error.JAVA_UNAVAILABLE": "No Java runtime is available for this computer.",
+  "error.UNSUPPORTED": "{what} is not supported yet.",
+  "error.PATH_TRAVERSAL": "A file inside an archive tried to escape its folder and was rejected.",
+  "error.ZIP": "An archive could not be opened.",
+  "error.CANCELLED": "The operation was cancelled.",
+  "error.GAME_SPAWN_FAILED": "The game could not be started.",
+  "error.NO_HOME_DIRECTORY": "Your home folder could not be found."
+}

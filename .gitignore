@@ -1,0 +1,16 @@
+# Rust
+heartwood/target/
+
+# macOS
+.DS_Store
+apps/macos/**/xcuserdata/
+apps/macos/**/DerivedData/
+apps/macos/**/*.xcuserstate
+
+# Windows
+apps/windows/**/bin/
+apps/windows/**/obj/
+
+# Editors
+.idea/
+.vscode/

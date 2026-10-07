@@ -1,0 +1,23 @@
+{
+  "$comment": "Every error kind Heartwood can return. Each needs an English translation key error.<KIND> in bark/i18n/en.json.",
+  "kinds": {
+    "IO": { "args": ["path"] },
+    "HTTP": { "args": ["url"] },
+    "HTTP_STATUS": { "args": ["url", "status"] },
+    "DOWNLOAD_HASH_MISMATCH": { "args": ["path", "expected", "actual"] },
+    "INVALID_JSON": { "args": ["from"] },
+    "INVALID_TOML": { "args": ["path"] },
+    "MALFORMED_DATA": { "args": ["detail"] },
+    "VERSION_NOT_FOUND": { "args": ["version"] },
+    "INSTANCE_NOT_FOUND": { "args": ["id"] },
+    "INSTANCE_EXISTS": { "args": ["id"] },
+    "INSTANCE_EDITION_UNSUPPORTED": { "args": ["edition"] },
+    "JAVA_UNAVAILABLE": { "args": ["component"] },
+    "UNSUPPORTED": { "args": ["what"] },
+    "PATH_TRAVERSAL": { "args": ["entry"] },
+    "ZIP": { "args": [] },
+    "CANCELLED": { "args": [] },
+    "GAME_SPAWN_FAILED": { "args": [] },
+    "NO_HOME_DIRECTORY": { "args": [] }
+  }
+}
