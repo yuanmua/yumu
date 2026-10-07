@@ -49,11 +49,13 @@ Yumu 是一个 Minecraft 启动器。Rust 核心库 Heartwood 包含全部逻辑
 
 - 改了行为就改对应文档，同一个 PR。
 - 重要决定写 ADR，`docs/adr/0000-template.md`。
-- 文档用中文，代码、标识符、提交信息、日志用英文。
+- 文档、提交信息、PR 描述用中文；代码、标识符、代码注释、日志用英文。
 
 ## 提交
 
-Conventional Commits，scope 用 `heartwood`、`grain`、`yumu`、`macos`、`bark`、`docs`。
+Conventional Commits，`type(scope)` 英文，标题与正文中文。scope 用 `heartwood`、`grain`、`yumu`、`macos`、`bark`、`docs`。正文写为什么和怎么验证的，不复述代码。详见 `docs/coding-standards/git-workflow.md`。
+
+提交信息和 PR 描述里不加任何 AI 署名或生成痕迹（没有 `Co-Authored-By`、`Generated with` 之类的行）。作者就是提交的人。
 
 ## 完成一个任务前自查
 

@@ -8,25 +8,41 @@
 
 ## 2. 提交信息
 
-Conventional Commits：
+团队以中文和英文为主，提交信息用**中文**写，结构沿用 Conventional Commits，`type` 与 `scope` 保持英文小写，方便工具解析与生成 CHANGELOG：
 
 ```
-<type>(<scope>): <subject>
+<type>(<scope>): <中文一句话说明>
 
-<body>
+<正文：为什么改、改了什么、怎么验证的。每行不超过 72 个字符宽度。>
 
 <footer>
 ```
 
 - `type`：`feat`、`fix`、`refactor`、`perf`、`docs`、`test`、`build`、`ci`、`chore`。
-- `scope`：`heartwood`、`grain`、`bark`、`macos`、`windows`、`linux`、`docs`、`ci`，或 `yumu`。
-- `subject` 用英文祈使句，小写开头，不加句号，不超过 72 字符。
+- `scope`：`heartwood`、`grain`、`bark`、`macos`、`windows`、`linux`、`docs`、`ci`，或 `yumu`。多个用逗号分隔。
+- 标题不超过 50 个字，不加句号，说清楚"做了什么"，不写"修改了一些文件"这类空话。
+- 正文写动机与取舍，代码本身能看出来的不重复。涉及实测的写上结果。
 - 破坏性变更在 footer 写 `BREAKING CHANGE:`，协议破坏性变更同时引用 ADR 编号。
 - 一个提交只做一件事。
+- 不加 AI 署名或生成痕迹（`Co-Authored-By`、`Generated with` 等），作者就是提交的人。
+- 代码、标识符、代码注释、日志仍然用英文，因为项目是面向全球的开源项目；提交信息和设计文档面向团队，用中文。
+
+示例：
+
+```
+feat(grain,macos): C ABI 层与 SwiftUI 应用
+
+Grain：手写 grain.h，进程内核心带任务运行时与事件回调，
+方法 instance.list/create/delete/launch 与 version.listGame，
+附 C ABI 往返测试。
+
+macOS：Swift Package 直接链接 Rust 静态库，零第三方依赖；
+实例列表、详情（安装进度、运行状态）、新建、空状态页。
+```
 
 ## 3. PR 规则
 
-- 标题即将来 squash 后的提交信息，遵循上面的格式。
+- 标题即将来 squash 后的提交信息，遵循上面的格式，用中文。描述也用中文。
 - 描述模板（`.github/PULL_REQUEST_TEMPLATE.md`）：做了什么、为什么、怎么测的、是否改了协议或文档、体积影响。
 - 改了行为必须改文档，改了 `grain.h` 或 schema 必须改 `grain/CHANGELOG.md`。
 - 合并方式：squash merge，保持 `main` 线性。
