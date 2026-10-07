@@ -55,6 +55,10 @@ pub enum Error {
     Spawn(#[source] std::io::Error),
     #[error("operation cancelled")]
     Cancelled,
+    #[error("invalid request: {0}")]
+    InvalidRequest(String),
+    #[error("runtime failure: {0}")]
+    Runtime(#[source] std::io::Error),
     #[error("home directory not found")]
     NoHome,
 }
@@ -80,6 +84,8 @@ impl Error {
             Self::Zip(_) => "ZIP",
             Self::Join(_) | Self::Cancelled => "CANCELLED",
             Self::Spawn(_) => "GAME_SPAWN_FAILED",
+            Self::InvalidRequest(_) => "INVALID_REQUEST",
+            Self::Runtime(_) => "INTERNAL",
             Self::NoHome => "NO_HOME_DIRECTORY",
         }
     }

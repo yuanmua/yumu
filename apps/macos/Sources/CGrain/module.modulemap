@@ -1,0 +1,4 @@
+module CGrain {
+    header "grain.h"
+    export *
+}

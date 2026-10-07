@@ -22,6 +22,14 @@ cargo run -p yumu -- version list
 
 数据目录默认在 `~/Library/Application Support/Yumu`，可用 `YUMU_DATA_DIR` 环境变量指到别处，测试时建议指向临时目录。
 
+## macOS 应用
+
+```bash
+apps/macos/build.sh && open apps/macos/.build/Yumu.app
+```
+
+脚本会编译 Rust 静态库、生成翻译与令牌、`swift build`，再组装 `Yumu.app`。改了 `bark/i18n/*.json` 或 `bark/tokens/*.json` 后重新跑脚本，生成文件要一起提交。
+
 ## 提交前检查
 
 三条全过才算完成：

@@ -37,16 +37,22 @@ const char* grain_api_version(void);                    // 接口版本，semver
 
 方法名 `<namespace>.<verb>`。
 
-| 命名空间 | 方法 | 同步/异步 |
-|---|---|---|
-| `instance` | `list`、`get`、`create`、`update`、`delete`、`duplicate` | 同步 |
-| `instance` | `install`、`launch` | 异步 |
-| `version` | `listGame`、`listLoader` | 同步（缓存）/ 异步（刷新） |
-| `account` | `list`、`addOffline`、`remove`、`setActive`、`beginMicrosoftLogin` | 同步 / 异步 |
-| `mod`、`resource`、`modpack` | 后续阶段 | |
-| `discover` | `scan` | 异步 |
-| `task` | `list`、`cancel` | 同步 |
-| `settings` | `get`、`update` | 同步 |
+| 命名空间 | 方法 | 同步/异步 | 状态 |
+|---|---|---|---|
+| `grain` | `ping` | 同步 | 已实现 |
+| `instance` | `list`、`create`、`delete` | 同步 | 已实现 |
+| `instance` | `launch`（补齐缺失文件后启动，结果 `{pid}`） | 异步 | 已实现 |
+| `version` | `listGame`（结果 `{latestRelease, versions:[{id,kind,releaseTime}]}`） | 异步 | 已实现 |
+| `instance` | `get`、`update`、`duplicate` | 同步 | 计划 |
+| `account` | `list`、`addOffline`、`remove`、`setActive`、`beginMicrosoftLogin` | 同步 / 异步 | 阶段 2 |
+| `discover` | `scan` | 异步 | 阶段 2 |
+| `mod`、`resource`、`modpack` | | | 阶段 4 |
+| `settings` | `get`、`update` | 同步 | 计划 |
+
+`instance.list` 返回 `[{id, name, gameVersion, loaderKind, lastPlayedAt, playtimeSeconds, running}]`。
+`instance.create` 参数 `{name, gameVersion}`，返回 `{id}`。`instance.launch` 参数 `{id, playerName}`。
+
+同步方法在调用线程上执行，只允许毫秒级操作；凡是会碰网络或长时间磁盘 IO 的方法都是异步方法。用 `grain_start` 调同步方法、或用 `grain_call` 调异步方法，都返回 `INVALID_REQUEST`。
 
 ## 4. 事件
 
@@ -54,9 +60,9 @@ const char* grain_api_version(void);                    // 接口版本，semver
 
 | topic | payload |
 |---|---|
-| `task.progress` | `{taskId, fraction, bytesDone, bytesTotal, stage:{kind,args}}` |
+| `task.progress` | `{taskId, bytesDone, bytesTotal}` |
 | `task.completed` | `{taskId, result}` |
-| `task.failed` | `{taskId, error:{kind,args}}` |
+| `task.failed` | `{taskId, error:{kind,args,detail}}` |
 | `task.cancelled` | `{taskId}` |
 | `instance.changed` | `{id, change}` |
 | `game.started` | `{instanceId, pid}` |
@@ -67,7 +73,7 @@ const char* grain_api_version(void);                    // 接口版本，semver
 
 ## 5. 错误
 
-`kind` 是 SCREAMING_SNAKE_CASE，全部登记在 `grain/schema/errors.json`，每个都有对应的英文翻译键 `error.<KIND>`。核心 `Error` 枚举的每个变体对应且只对应一个 kind。
+`kind` 是 SCREAMING_SNAKE_CASE，全部登记在 `grain/schema/errors.json`，每个都有对应的英文翻译键 `error.<KIND>`（`bark/i18n/build.py` 检查）。`args` 的键见登记表，`detail` 是给开发者看的英文描述，界面不展示它，除非没有翻译。核心 `Error` 枚举的每个变体对应且只对应一个 kind。
 
 ## 6. 线程与内存
 

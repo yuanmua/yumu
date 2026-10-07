@@ -202,6 +202,13 @@ impl Store {
         tokio::fs::rename(&part, &path).await.map_err(io(&path))
     }
 
+    /// Delete an instance and everything inside it, worlds included.
+    pub async fn delete(&self, id: &str) -> Result<()> {
+        self.load(id).await?;
+        let dir = self.instance_dir(id);
+        tokio::fs::remove_dir_all(&dir).await.map_err(io(&dir))
+    }
+
     /// Create an instance and return its id (the directory name).
     pub async fn create(&self, name: &str, game_version: &str) -> Result<String> {
         let id = slug(name);

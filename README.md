@@ -10,7 +10,7 @@ Yumu 是一个简洁、轻量、跨平台的 Minecraft 启动器。核心用 Rus
 - 面向全球用户，默认跟随系统语言
 - 支持小众 CPU 架构（RISC-V、LoongArch 等）
 
-> 当前阶段：阶段 1，macOS 上原版可下载并启动（命令行）。
+> 当前阶段：macOS 应用可新建实例、下载并启动原版；阶段 2（本机发现与账号）进行中。
 
 ## 命名
 
@@ -26,7 +26,7 @@ Yumu 是一个简洁、轻量、跨平台的 Minecraft 启动器。核心用 Rus
 ```
 yumu/
 ├── heartwood/   Rust workspace：核心库 heartwood、C ABI 层 grain、命令行 yumu
-├── grain/       接口 schema 与错误码登记
+├── grain/       错误码登记与接口变更记录；C 头文件在 heartwood/crates/grain/include
 ├── bark/        设计令牌、动效规范、翻译源
 ├── apps/
 │   ├── macos/   SwiftUI 应用
@@ -57,6 +57,12 @@ yumu/
 
 ```bash
 cd heartwood && cargo run -p yumu -- play
+```
+
+或者构建 macOS 应用：
+
+```bash
+apps/macos/build.sh && open apps/macos/.build/Yumu.app
 ```
 
 第一次运行会下载 Java 运行时、游戏文件与资源，之后直接启动。详见[开发环境](docs/dev-setup.md)。

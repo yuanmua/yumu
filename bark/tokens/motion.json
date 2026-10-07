@@ -1,0 +1,16 @@
+{
+  "quick": {
+    "kind": "easeOut",
+    "duration": 0.15
+  },
+  "standard": {
+    "kind": "spring",
+    "response": 0.35,
+    "damping": 0.85
+  },
+  "emphasized": {
+    "kind": "spring",
+    "response": 0.5,
+    "damping": 0.8
+  }
+}

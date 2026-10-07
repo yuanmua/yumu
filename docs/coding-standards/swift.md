@@ -6,34 +6,32 @@
 - 最低部署目标 macOS 14。
 - 格式化：SwiftFormat，配置 `.swiftformat` 在 `apps/macos/`。
 - Lint：SwiftLint，配置 `.swiftlint.yml`，CI 强制零警告。
-- 项目用 Xcode 工程 + Swift Package 划分模块，第三方依赖只用 SwiftPM。
+- 工程是一个 Swift Package，没有 Xcode 工程文件；`build.sh` 负责编译 Rust 静态库、生成翻译与令牌、`swift build`、组装 `Yumu.app`。Xcode 可以直接打开 `Package.swift` 开发。第三方依赖只用 SwiftPM，目前为零。
 
-## 2. 模块划分
+## 2. 目录
 
 ```
 apps/macos/
-├── Yumu.xcodeproj
-├── Yumu/                      App target：入口、窗口、依赖装配
-├── Packages/
-│   ├── Grain/                 C 头文件的 Swift 封装：GrainClient actor、Codable 模型、事件流
-│   ├── Bark/                  设计令牌、通用组件、动效常量。生成代码在 Generated/
-│   ├── Features/
-│   │   ├── Instances/
-│   │   ├── Mods/
-│   │   ├── Modpacks/
-│   │   ├── Accounts/
-│   │   └── Settings/
-│   └── Core/                  跨 Feature 的状态容器、路由
-└── Tests/
+├── Package.swift
+├── Info.plist                 应用包的 plist，build.sh 拷贝进 Yumu.app
+├── build.sh
+└── Sources/
+    ├── CGrain/                系统库目标：module.modulemap + 指向 heartwood 的 grain.h 符号链接
+    └── Yumu/
+        ├── YumuApp.swift      入口与窗口
+        ├── Grain/             GrainClient（唯一碰 C 接口的地方）与 Codable 模型
+        ├── Bark/              L() 翻译助手、动效助手，Tokens.generated.swift 由 bark/codegen 生成
+        ├── Core/              AppModel：跨界面的状态与事件处理
+        ├── Features/<Feature>/ 各界面的 View
+        └── Resources/         <locale>.lproj/Localizable.strings，由 bark/i18n/build.py 生成
 ```
 
-依赖方向：`Yumu` → `Features` → `Core` → `Grain`、`Bark`。Feature 之间不互相依赖，需要通信经由 `Core`。
+依赖方向：`Features` → `Core` → `Grain`、`Bark`。Feature 之间不互相依赖，需要通信经由 `Core`。
 
 ## 3. 架构模式
 
-- MVVM。View 只声明界面，ViewModel 持有状态与意图处理，Model 来自 Grain 生成类型。
-- ViewModel 是 `@Observable final class`，标注 `@MainActor`。
-- `GrainClient` 是 `actor`，封装 `grain.h` 的全部调用：`grain_call` 包成泛型 `call<P: Encodable, R: Decodable>`，C 回调转成 `AsyncStream<GrainEvent>` 并切回主线程。界面其他部分不直接碰 C 函数。
+- View 只声明界面；状态与意图处理在 `@MainActor @Observable` 的模型类里（目前一个 `AppModel`，按 Feature 拆分时再分）；Model 是与 Grain schema 对应的 `Codable` 结构。
+- `GrainClient` 是 `Sendable final class`，封装 `grain.h` 的全部调用：`grain_call` 包成泛型 `call<R: Decodable>(method, params)`，C 回调把事件送进 `AsyncStream<GrainEvent>`，模型在主线程上 `for await` 消费。界面其他部分不直接碰 C 函数。
 - View 里不出现业务判断，不直接调用 `GrainClient`。
 - 导航状态集中在 `Core/Router`，用 `NavigationSplitView` 与 `NavigationStack`。
 
@@ -53,15 +51,14 @@ apps/macos/
 
 ## 6. 文案与本地化
 
-- 所有用户可见字符串用 `String(localized:)` 或 `LocalizedStringKey`，键来自 `bark/i18n/en.json` 生成的 String Catalog。
+- 所有用户可见字符串经 `L("key")` 取得，键定义在 `bark/i18n/en.json`，生成到 `Resources/<locale>.lproj/Localizable.strings`。
 - 禁止在代码里写硬编码英文。
 - 错误显示：从 Grain 错误的 `kind` 查键 `error.<KIND>`，`args` 作为插值。
 
 ## 7. 设计令牌与动效
 
 - 颜色、间距、圆角、字号、动画时长与曲线一律引用 `Bark` 包的生成常量，不在 View 里写字面量。
-- 动画用 `.animation(Bark.Motion.standard, value:)` 形式，`Motion` 常量集中定义。
-- 尊重系统「减弱动态效果」设置，`Bark.Motion` 在该设置开启时自动退化为无动画。
+- 动画用 `.barkAnimation(Bark.Motion.standard, value:)`，它在系统开启「减弱动态效果」时自动退化为无动画。
 - 优先使用 SwiftUI 原生动画；需要精细控制时下沉 `NSViewRepresentable`，并在文件头注释说明原因。
 
 ## 8. 测试
