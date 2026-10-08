@@ -22,7 +22,7 @@ struct AccountBar: View {
             if !model.accounts.isEmpty { Divider() }
             Button(L("account.addMicrosoft")) { model.beginMicrosoftLogin() }
             Button(L("account.addOffline")) { addingOffline = true }
-                .disabled(!model.hasMicrosoftAccount)
+                .disabled(!model.canAddOffline)
             if let active = model.activeAccount {
                 Divider()
                 Button(L("account.remove"), role: .destructive) { model.removeAccount(active.id) }
@@ -47,7 +47,7 @@ struct AccountBar: View {
         .menuStyle(.borderlessButton)
         .padding(Bark.Space.md)
         .background(.bar)
-        .help(model.hasMicrosoftAccount ? "" : L("account.offlineHint"))
+        .help(model.offlineWithoutMicrosoft ? L("account.devOffline") : model.hasMicrosoftAccount ? "" : L("account.offlineHint"))
         .sheet(isPresented: $addingOffline) { OfflineAccountSheet() }
         .sheet(isPresented: Binding(get: { model.loggingIn }, set: { if !$0 { model.cancelLogin() } })) {
             LoginSheet()

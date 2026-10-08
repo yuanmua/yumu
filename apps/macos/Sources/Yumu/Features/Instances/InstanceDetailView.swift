@@ -24,7 +24,10 @@ struct InstanceDetailView: View {
             .labelsHidden()
             .frame(maxWidth: 360)
             switch tab {
-            case .overview: OverviewTab(instance: instance)
+            case .overview:
+                OverviewTab(instance: instance)
+                AdvancedSettingsView(instance: instance)
+                Spacer()
             case .mods: ModsView(instance: instance)
             case .resources: ResourcesView(instance: instance)
             }
@@ -136,7 +139,6 @@ private struct OverviewTab: View {
             }
         }
         .font(.callout)
-        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     private var lastPlayed: String {

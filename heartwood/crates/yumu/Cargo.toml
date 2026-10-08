@@ -14,5 +14,8 @@ anyhow.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 
+[features]
+dev-offline = ["heartwood/dev-offline"]
+
 [lints]
 workspace = true

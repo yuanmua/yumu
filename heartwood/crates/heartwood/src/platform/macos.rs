@@ -31,6 +31,58 @@ pub fn official_launcher_dir() -> Result<PathBuf> {
     Ok(home()?.join("Library/Application Support/minecraft"))
 }
 
+pub const JAVA_BINARY: &str = "java";
+
+/// Other launchers whose worlds we can offer to import.
+pub fn other_launcher_dirs() -> Vec<(String, PathBuf)> {
+    let Ok(support) = home().map(|h| h.join("Library/Application Support")) else {
+        return Vec::new();
+    };
+    [
+        ("prism", "PrismLauncher"),
+        ("multimc", "MultiMC"),
+        ("modrinth", "com.modrinth.theseus"),
+    ]
+    .iter()
+    .map(|(name, dir)| ((*name).to_owned(), support.join(dir)))
+    .filter(|(_, dir)| dir.is_dir())
+    .collect()
+}
+
+/// JDK home directories installed on this machine.
+pub async fn java_homes() -> Vec<PathBuf> {
+    let mut roots = vec![PathBuf::from("/Library/Java/JavaVirtualMachines")];
+    if let Ok(home) = home() {
+        roots.push(home.join("Library/Java/JavaVirtualMachines"));
+    }
+    let mut homes = Vec::new();
+    for root in roots {
+        let Ok(mut entries) = tokio::fs::read_dir(&root).await else {
+            continue;
+        };
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            let candidate = entry.path().join("Contents/Home");
+            if candidate.join("bin/java").is_file() {
+                homes.push(candidate);
+            }
+        }
+    }
+    for brew in ["/opt/homebrew/opt", "/usr/local/opt"] {
+        let Ok(mut entries) = tokio::fs::read_dir(brew).await else {
+            continue;
+        };
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            if entry.file_name().to_string_lossy().starts_with("openjdk") {
+                let candidate = entry.path().join("libexec/openjdk.jdk/Contents/Home");
+                if candidate.join("bin/java").is_file() {
+                    homes.push(candidate);
+                }
+            }
+        }
+    }
+    homes
+}
+
 pub fn java_executable(runtime_dir: &Path) -> PathBuf {
     runtime_dir.join("jre.bundle/Contents/Home/bin/java")
 }

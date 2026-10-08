@@ -6,15 +6,14 @@
 - 最低部署目标 macOS 14。
 - 格式化：SwiftFormat，配置 `.swiftformat` 在 `apps/macos/`。
 - Lint：SwiftLint，配置 `.swiftlint.yml`，CI 强制零警告。
-- 工程是一个 Swift Package，没有 Xcode 工程文件；`build.sh` 负责编译 Rust 静态库、生成翻译与令牌、`swift build`、组装 `Yumu.app`。Xcode 可以直接打开 `Package.swift` 开发。第三方依赖只用 SwiftPM，目前为零。
+- 工程是一个 Swift Package，没有 Xcode 工程文件；仓库根的 `build.sh` 负责编译 Rust 静态库、生成翻译与令牌、画图标、`swift build`、组装并签名 `dist/Yumu.app`。Xcode 可以直接打开 `Package.swift` 开发。第三方依赖只用 SwiftPM，目前为零。
 
 ## 2. 目录
 
 ```
 apps/macos/
 ├── Package.swift
-├── Info.plist                 应用包的 plist，build.sh 拷贝进 Yumu.app
-├── build.sh
+├── Info.plist                 应用包的 plist，根目录 build.sh 拷贝进 Yumu.app
 └── Sources/
     ├── CGrain/                系统库目标：module.modulemap + 指向 heartwood 的 grain.h 符号链接
     └── Yumu/

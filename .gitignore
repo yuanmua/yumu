@@ -14,3 +14,6 @@ apps/windows/**/obj/
 # Editors
 .idea/
 .vscode/
+
+# Build output
+dist/

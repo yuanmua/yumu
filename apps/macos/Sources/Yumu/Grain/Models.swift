@@ -95,6 +95,54 @@ struct LoginCode: Decodable, Hashable, Sendable {
     let verificationUri: String
 }
 
+struct CoreInfo: Decodable, Sendable {
+    let version: String
+    let offlineWithoutMicrosoft: Bool
+}
+
+struct InstanceSettings: Codable, Hashable, Sendable {
+    let id: String
+    var name: String
+    let gameVersion: String
+    let loaderKind: String
+    let loaderVersion: String
+    var javaProvider: String
+    var javaPath: String
+    var maxMb: UInt32
+    var extraArgs: [String]
+    var width: UInt32
+    var height: UInt32
+}
+
+struct Scan: Decodable, Hashable, Sendable {
+    let installations: [Installation]
+    let java: [JavaInstall]
+}
+
+struct Installation: Decodable, Hashable, Sendable {
+    let launcher: String
+    let path: String
+    let versions: [String]
+    let saves: [Save]
+}
+
+struct Save: Decodable, Identifiable, Hashable, Sendable {
+    let name: String
+    let path: String
+    let lastPlayed: UInt64
+
+    var id: String { path }
+}
+
+struct JavaInstall: Decodable, Identifiable, Hashable, Sendable {
+    let path: String
+    let version: String
+    let major: UInt32
+
+    var id: String { path }
+}
+
+struct SaveParams: Encodable, Sendable { let id: String; let path: String }
 struct Empty: Codable, Sendable {}
 struct NameParams: Encodable, Sendable { let name: String }
 struct ProjectParams: Encodable, Sendable { let projectId: String }

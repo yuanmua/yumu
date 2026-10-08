@@ -58,6 +58,7 @@ heartwood/
 │       ├── mods.rs     Modrinth 搜索、安装、依赖解析，本地模组列表
 │       ├── modpack.rs  .mrpack 导入
 │       ├── resource.rs 光影包与资源包
+│       ├── discover.rs 本机已有的存档、版本与 Java
     │       └── discover.rs 识别本机已有的 Minecraft 安装与存档
     ├── grain/              C ABI 层：extern "C" 函数、句柄、回调、JSON 编解码。头文件 include/grain.h 手写
     └── yumu/               命令行二进制
@@ -82,7 +83,7 @@ heartwood/
 | 凭据存储 | `accounts.toml` 0600（钥匙串为后续改进） | 同左 | 同左 |
 | 游戏进程分离 | 独立进程组 | 不加入 Job 对象 | 独立进程组 |
 
-可选能力用 Cargo feature 开关（例如 `curseforge`），不需要的构建直接裁掉。
+可选能力用 Cargo feature 开关，不需要的构建直接裁掉。目前只有一个：`dev-offline`（开发版放开离线账号限制），`./build.sh dev` 打开。
 
 ## 5. 核心的运行模型
 

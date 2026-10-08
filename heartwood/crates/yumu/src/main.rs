@@ -63,6 +63,8 @@ enum Command {
         #[command(subcommand)]
         command: AccountCommand,
     },
+    /// Find worlds, versions and Java runtimes already on this computer
+    Discover,
 }
 
 #[derive(Subcommand)]
@@ -155,6 +157,22 @@ async fn main() -> anyhow::Result<()> {
         }
         Command::Mod { command } => run_mod(&store, &downloader, command).await,
         Command::Account { command } => run_account(&store, &downloader, command).await,
+        Command::Discover => {
+            let scan = heartwood::discover::scan().await?;
+            for installation in &scan.installations {
+                println!("{}\t{}", installation.launcher, installation.path.display());
+                for version in &installation.versions {
+                    println!("  version\t{version}");
+                }
+                for save in &installation.saves {
+                    println!("  save\t{}\t{}", save.name, save.path.display());
+                }
+            }
+            for java in &scan.java {
+                println!("java\t{}\t{}", java.version, java.path.display());
+            }
+            Ok(())
+        }
         Command::Modpack {
             command: ModpackCommand::Import { path, name },
         } => {

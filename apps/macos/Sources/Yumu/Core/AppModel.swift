@@ -15,6 +15,8 @@ private enum TaskKind {
     case installResource(instance: String, kind: ResourceKind, project: String)
     case importPack
     case login
+    case scan
+    case importSave(instance: String)
 }
 
 enum SearchScope: Hashable, Sendable {
@@ -37,6 +39,11 @@ final class AppModel {
     private(set) var installingProjects: Set<String> = []
     private(set) var importing: Activity?
     private(set) var accounts: [AccountSummary] = []
+    private(set) var offlineWithoutMicrosoft = false
+    private(set) var settings: InstanceSettings?
+    private(set) var scan: Scan?
+    private(set) var scanning = false
+    private(set) var importingSave = false
     private(set) var loginCode: LoginCode?
     private(set) var loggingIn = false
     var error: GrainError?
@@ -47,7 +54,10 @@ final class AppModel {
 
     init() {
         do {
-            client = try GrainClient()
+            let core = try GrainClient()
+            let info: CoreInfo = try core.call("grain.info")
+            client = core
+            offlineWithoutMicrosoft = info.offlineWithoutMicrosoft
             startupError = nil
         } catch {
             client = nil
@@ -61,6 +71,7 @@ final class AppModel {
 
     var activeAccount: AccountSummary? { accounts.first { $0.active } }
     var hasMicrosoftAccount: Bool { accounts.contains { $0.isMicrosoft } }
+    var canAddOffline: Bool { hasMicrosoftAccount || offlineWithoutMicrosoft }
 
     // MARK: Instances
 
@@ -114,6 +125,47 @@ final class AppModel {
         guard let client, versions == nil, !tasks.values.contains(where: { if case .versions = $0 { true } else { false } }) else { return }
         do {
             tasks[try client.start("version.listGame", VersionParams(snapshots: false))] = .versions
+        } catch {
+            report(error)
+        }
+    }
+
+    func loadSettings(_ id: String) {
+        guard let client else { return }
+        do {
+            settings = try client.call("instance.get", IdParams(id: id))
+        } catch {
+            report(error)
+        }
+    }
+
+    func updateSettings(_ updated: InstanceSettings) {
+        guard let client else { return }
+        do {
+            let _: Empty = try client.call("instance.update", updated)
+            settings = updated
+        } catch {
+            report(error)
+        }
+    }
+
+    // MARK: Discover
+
+    func rescan() {
+        guard let client, !scanning else { return }
+        do {
+            tasks[try client.start("discover.scan", Empty())] = .scan
+            scanning = true
+        } catch {
+            report(error)
+        }
+    }
+
+    func importSave(_ path: String, into instanceId: String) {
+        guard let client, !importingSave else { return }
+        do {
+            tasks[try client.start("discover.importSave", SaveParams(id: instanceId, path: path))] = .importSave(instance: instanceId)
+            importingSave = true
         } catch {
             report(error)
         }
@@ -361,6 +413,11 @@ final class AppModel {
                     loggingIn = false
                     loginCode = nil
                     loadAccounts()
+                case .scan:
+                    scan = try decoder.decode(Envelope<TaskCompleted<Scan>>.self, from: event.data).payload.result
+                    scanning = false
+                case .importSave:
+                    importingSave = false
                 case .importPack:
                     importing = nil
                     let created = try decoder.decode(Envelope<TaskCompleted<IdParams>>.self, from: event.data).payload.result
@@ -402,6 +459,8 @@ final class AppModel {
         case .login:
             loggingIn = false
             loginCode = nil
+        case .scan: scanning = false
+        case .importSave: importingSave = false
         case .versions, nil: break
         }
     }

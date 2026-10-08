@@ -7,7 +7,9 @@ use std::time::Instant;
 use heartwood::download::Progress;
 use heartwood::mojang::fetch_manifest;
 use heartwood::resource::Kind;
-use heartwood::{Error, Result, account, auth, install, launch, loader, modpack, mods, resource};
+use heartwood::{
+    Error, Result, account, auth, discover, install, launch, loader, modpack, mods, resource,
+};
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
@@ -25,6 +27,8 @@ const ASYNC_METHODS: &[&str] = &[
     "modpack.search",
     "modpack.import",
     "modpack.installModrinth",
+    "discover.scan",
+    "discover.importSave",
 ];
 
 #[derive(Deserialize)]
@@ -54,6 +58,27 @@ struct LaunchParams {
 #[serde(rename_all = "camelCase")]
 struct NameParams {
     name: String,
+}
+
+/// Editable instance settings; every field optional so the interface can send only what changed.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateParams {
+    id: String,
+    name: Option<String>,
+    java_provider: Option<String>,
+    java_path: Option<String>,
+    max_mb: Option<u32>,
+    extra_args: Option<Vec<String>>,
+    width: Option<u32>,
+    height: Option<u32>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SaveParams {
+    id: String,
+    path: PathBuf,
 }
 
 #[derive(Deserialize, Default)]
@@ -149,6 +174,58 @@ pub(crate) async fn call(core: &Core, method: &str, params: Value) -> Result<Val
     }
     match method {
         "grain.ping" => Ok(json!({ "pong": true })),
+        "grain.info" => Ok(json!({
+            "version": heartwood::VERSION,
+            "offlineWithoutMicrosoft": account::OFFLINE_WITHOUT_MICROSOFT,
+        })),
+        "instance.get" => {
+            let params: IdParams = parse(params)?;
+            let instance = core.store.load(&params.id).await?;
+            Ok(json!({
+                "id": params.id,
+                "name": instance.name,
+                "gameVersion": instance.game.version,
+                "loaderKind": instance.loader.kind,
+                "loaderVersion": instance.loader.version,
+                "javaProvider": instance.java.provider,
+                "javaPath": instance.java.path,
+                "maxMb": instance.memory.max_mb,
+                "extraArgs": instance.jvm.extra_args,
+                "width": instance.window.width,
+                "height": instance.window.height,
+            }))
+        }
+        "instance.update" => {
+            let params: UpdateParams = parse(params)?;
+            let mut instance = core.store.load(&params.id).await?;
+            if let Some(name) = params.name.filter(|n| !n.trim().is_empty()) {
+                name.trim().clone_into(&mut instance.name);
+            }
+            if let Some(provider) = params.java_provider {
+                instance.java.provider = provider;
+            }
+            if let Some(path) = params.java_path {
+                instance.java.path = path;
+            }
+            if let Some(max_mb) = params.max_mb {
+                instance.memory.max_mb = max_mb.clamp(512, 65536);
+            }
+            if let Some(extra_args) = params.extra_args {
+                instance.jvm.extra_args = extra_args;
+            }
+            if let Some(width) = params.width {
+                instance.window.width = width.max(320);
+            }
+            if let Some(height) = params.height {
+                instance.window.height = height.max(240);
+            }
+            core.store.save(&params.id, &instance).await?;
+            core.emit(
+                "instance.changed",
+                json!({ "id": params.id, "change": "updated" }),
+            );
+            Ok(json!({}))
+        }
         "instance.list" => list(core).await,
         "instance.create" => {
             let params: CreateParams = parse(params)?;
@@ -382,6 +459,12 @@ async fn start_content(
             )
             .await?;
             Ok(json!({ "fileName": file_name }))
+        }
+        "discover.scan" => to_value(&discover::scan().await?),
+        "discover.importSave" => {
+            let params: SaveParams = parse(params)?;
+            let name = discover::import_save(&core.store, &params.id, &params.path).await?;
+            Ok(json!({ "name": name }))
         }
         "modpack.installModrinth" => {
             let params: ProjectParams = parse(params)?;

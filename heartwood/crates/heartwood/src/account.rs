@@ -15,6 +15,8 @@ pub const OFFLINE: &str = "offline";
 const FILE_NAME: &str = "accounts.toml";
 /// Refresh when the Minecraft token has less than this many seconds left.
 const REFRESH_MARGIN: u64 = 600;
+/// Development builds skip ADR 0009 so the game can be tested before Mojang approves the client id.
+pub const OFFLINE_WITHOUT_MICROSOFT: bool = cfg!(feature = "dev-offline");
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -82,7 +84,7 @@ impl Accounts {
         if self.accounts.len() == before {
             return Err(Error::AccountNotFound(id.to_owned()));
         }
-        if !self.has_microsoft() {
+        if !self.has_microsoft() && !OFFLINE_WITHOUT_MICROSOFT {
             // Prism's rule: offline accounts only exist alongside a real one.
             self.accounts.retain(|account| account.kind != OFFLINE);
         }
@@ -110,7 +112,7 @@ impl Accounts {
 
     /// Add an offline account; allowed only when a Microsoft account is present.
     pub fn add_offline(&mut self, name: &str) -> Result<Account> {
-        if !self.has_microsoft() {
+        if !self.has_microsoft() && !OFFLINE_WITHOUT_MICROSOFT {
             return Err(Error::OfflineRequiresMicrosoft);
         }
         let account = offline(name);
@@ -228,6 +230,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(
+        feature = "dev-offline",
+        ignore = "rule disabled in development builds"
+    )]
     fn offline_requires_microsoft_and_goes_with_it() {
         let mut accounts = Accounts::default();
         assert!(matches!(

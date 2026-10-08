@@ -39,7 +39,10 @@ const char* grain_api_version(void);                    // 接口版本，semver
 
 | 命名空间 | 方法 | 同步/异步 | 状态 |
 |---|---|---|---|
-| `grain` | `ping` | 同步 | 已实现 |
+| `grain` | `ping`、`info` → `{version, offlineWithoutMicrosoft}` | 同步 | 已实现 |
+| `instance` | `get {id}` → 全部可编辑设置；`update {id, name?, javaProvider?, javaPath?, maxMb?, extraArgs?, width?, height?}` | 同步 | 已实现 |
+| `discover` | `scan` → `{installations:[{launcher, path, versions, saves:[{name, path, lastPlayed}]}], java:[{path, version, major}]}` | 异步 | 已实现 |
+| `discover` | `importSave {id, path}` → `{name}`，拷贝存档进实例 | 异步 | 已实现 |
 | `instance` | `list`、`create {name, gameVersion, loaderKind?, loaderVersion?}`、`delete {id}` | 同步 | 已实现 |
 | `instance` | `launch {id}`：用当前账号补齐缺失文件后启动，结果 `{pid}` | 异步 | 已实现 |
 | `version` | `listGame {snapshots?}` → `{latestRelease, versions:[{id,kind,releaseTime}]}` | 异步 | 已实现 |
@@ -52,8 +55,7 @@ const char* grain_api_version(void);                    // 接口版本，semver
 | `modpack` | `import {path, name?}` → `{id}`，目前支持 `.mrpack`；`search {query, offset?}`；`installModrinth {projectId}` → `{id}` | 异步 | 已实现 |
 | `account` | `list` → `[{id, kind, name, uuid, active}]`、`addOffline {name}`、`remove {id}`、`setActive {id}` | 同步 | 已实现 |
 | `account` | `beginMicrosoftLogin`：先推送 `account.loginCode`，用户在浏览器完成后结果 `{id, name}` | 异步 | 已实现 |
-| `instance` | `get`、`update`、`duplicate` | 同步 | 计划 |
-| `discover` | `scan` | 异步 | 阶段 2 |
+| `instance` | `duplicate` | 同步 | 计划 |
 | `settings` | `get`、`update` | 同步 | 计划 |
 
 `instance.list` 返回 `[{id, name, gameVersion, loaderKind, loaderVersion, lastPlayedAt, playtimeSeconds, running}]`。

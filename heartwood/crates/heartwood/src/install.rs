@@ -47,11 +47,21 @@ pub async fn install(
             Error::Malformed(format!("version {} has no client download", version.id))
         })?;
 
-    let component = version
-        .java_version
-        .as_ref()
-        .map_or("jre-legacy", |java| java.component.as_str());
-    let java = java::ensure_runtime(downloader, &cache, component, progress).await?;
+    let java = if instance.java.provider == "custom" && !instance.java.path.is_empty() {
+        let path = PathBuf::from(&instance.java.path);
+        if !path.is_file() {
+            return Err(Error::JavaUnavailable {
+                component: instance.java.path.clone(),
+            });
+        }
+        path
+    } else {
+        let component = version
+            .java_version
+            .as_ref()
+            .map_or("jre-legacy", |java| java.component.as_str());
+        java::ensure_runtime(downloader, &cache, component, progress).await?
+    };
 
     let libraries_dir = cache.join("libraries");
     let installer_libraries = installer
@@ -64,10 +74,19 @@ pub async fn install(
         natives,
     } = collect_libraries(&version, installer_libraries, &libraries_dir, progress)?;
 
-    let client_jar = cache
+    // Loaders expect the client jar to carry the profile's id (their ignore lists match on it), so
+    // each profile gets its own name; a hard link to the vanilla jar avoids a second download.
+    let vanilla_jar = cache
         .join("versions")
         .join(&game_version)
         .join(format!("{game_version}.jar"));
+    let client_jar = cache
+        .join("versions")
+        .join(&version.id)
+        .join(format!("{}.jar", version.id));
+    if client_jar != vanilla_jar && vanilla_jar.is_file() && !client_jar.exists() {
+        let _ = tokio::fs::hard_link(&vanilla_jar, &client_jar).await;
+    }
     downloads.push(download(&client, client_jar.clone(), progress));
     classpath.push(client_jar);
 
@@ -84,10 +103,6 @@ pub async fn install(
     downloader.fetch_all(downloads, progress).await?;
 
     if let Some((version_file, profile)) = &installer {
-        let vanilla_jar = cache
-            .join("versions")
-            .join(&game_version)
-            .join(format!("{game_version}.jar"));
         forge::process(
             version_file,
             profile,

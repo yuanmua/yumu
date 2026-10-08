@@ -18,5 +18,9 @@ zip.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 
+[features]
+# Development builds: offline accounts without a Microsoft account, for testing before Mojang approval.
+dev-offline = []
+
 [lints]
 workspace = true

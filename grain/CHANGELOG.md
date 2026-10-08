@@ -2,6 +2,9 @@
 
 ## 未发布
 
+- 新增方法：`grain.info`、`instance.get`、`instance.update`、`discover.scan`、`discover.importSave`。
+- 开发版特性 `dev-offline`：`grain.info.offlineWithoutMicrosoft` 为 true 时离线账号不要求先有微软账号。
+
 - 新增方法：`account.list`、`account.addOffline`、`account.remove`、`account.setActive`、`account.beginMicrosoftLogin`、`resource.install`、`modpack.search`、`modpack.installModrinth`。`mod.search` 新增 `projectType`，`id` 变为可选。`instance.launch` 不再接受 `playerName`，改用当前账号。
 - 新增事件：`account.loginCode`、`account.changed`。
 - 新增错误 kind：`AUTH_FAILED`、`AUTH_NO_XBOX_ACCOUNT`、`AUTH_NO_GAME`、`AUTH_APP_NOT_APPROVED`、`ACCOUNT_REQUIRED`、`ACCOUNT_NOT_FOUND`、`ACCOUNT_OFFLINE_REQUIRES_MICROSOFT`、`LOADER_INSTALL_FAILED`。

@@ -17,6 +17,7 @@ const API: &str = "https://api.modrinth.com/v2";
 const MODRINTH_HOSTS: &[&str] = &["cdn.modrinth.com"];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all(serialize = "camelCase"))]
 pub struct SearchHit {
     pub project_id: String,
     pub slug: String,
@@ -29,6 +30,7 @@ pub struct SearchHit {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all(serialize = "camelCase"))]
 pub struct SearchResult {
     pub hits: Vec<SearchHit>,
     pub total_hits: u64,

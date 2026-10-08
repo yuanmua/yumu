@@ -38,6 +38,40 @@ pub fn official_launcher_dir() -> Result<PathBuf> {
     Ok(home()?.join(".minecraft"))
 }
 
+pub const JAVA_BINARY: &str = "java";
+
+pub fn other_launcher_dirs() -> Vec<(String, PathBuf)> {
+    let Ok(data) = xdg("XDG_DATA_HOME", ".local/share")
+        .map(|d| d.parent().map(Path::to_path_buf).unwrap_or(d))
+    else {
+        return Vec::new();
+    };
+    [
+        ("prism", "PrismLauncher"),
+        ("multimc", "multimc"),
+        ("modrinth", "ModrinthApp"),
+    ]
+    .iter()
+    .map(|(name, dir)| ((*name).to_owned(), data.join(dir)))
+    .filter(|(_, dir)| dir.is_dir())
+    .collect()
+}
+
+pub async fn java_homes() -> Vec<PathBuf> {
+    let mut homes = Vec::new();
+    for root in ["/usr/lib/jvm", "/usr/lib64/jvm", "/opt"] {
+        let Ok(mut entries) = tokio::fs::read_dir(root).await else {
+            continue;
+        };
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            if entry.path().join("bin/java").is_file() {
+                homes.push(entry.path());
+            }
+        }
+    }
+    homes
+}
+
 pub fn java_executable(runtime_dir: &Path) -> PathBuf {
     runtime_dir.join("bin/java")
 }

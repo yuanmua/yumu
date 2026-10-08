@@ -6,6 +6,7 @@ struct ContentView: View {
     @State private var showingNew = false
     @State private var importing = false
     @State private var browsing = false
+    @State private var discovering = false
     @State private var dropTargeted = false
 
     private static let mrpack = UTType(filenameExtension: "mrpack") ?? .zip
@@ -20,12 +21,12 @@ struct ContentView: View {
                 )
             } else {
                 NavigationSplitView {
-                    InstanceList(showingNew: $showingNew, importing: $importing, browsing: $browsing)
+                    InstanceList(showingNew: $showingNew, importing: $importing, browsing: $browsing, discovering: $discovering)
                 } detail: {
                     if let instance = model.selected {
                         InstanceDetailView(instance: instance)
                     } else {
-                        EmptyStateView(showingNew: $showingNew, importing: $importing, browsing: $browsing)
+                        EmptyStateView(showingNew: $showingNew, importing: $importing, browsing: $browsing, discovering: $discovering)
                     }
                 }
                 .overlay { if dropTargeted { dropOverlay } }
@@ -37,6 +38,7 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showingNew) { NewInstanceSheet() }
         .sheet(isPresented: $browsing) { ModpackBrowserSheet() }
+        .sheet(isPresented: $discovering) { DiscoverSheet() }
         .fileImporter(isPresented: $importing, allowedContentTypes: [Self.mrpack]) { result in
             if case .success(let url) = result { model.importPack(url) }
         }
@@ -78,6 +80,7 @@ struct InstanceList: View {
     @Binding var showingNew: Bool
     @Binding var importing: Bool
     @Binding var browsing: Bool
+    @Binding var discovering: Bool
     @State private var pendingDelete: InstanceSummary?
 
     var body: some View {
@@ -93,6 +96,7 @@ struct InstanceList: View {
         .navigationSplitViewColumnWidth(min: 200, ideal: 240)
         .toolbar {
             ToolbarItemGroup {
+                Button { discovering = true } label: { Label(L("discover.button"), systemImage: "externaldrive.badge.magnifyingglass") }
                 Button { browsing = true } label: { Label(L("packs.browse"), systemImage: "shippingbox") }
                 Button { importing = true } label: { Label(L("import.title"), systemImage: "square.and.arrow.down") }
                 Button { showingNew = true } label: { Label(L("instances.new"), systemImage: "plus") }

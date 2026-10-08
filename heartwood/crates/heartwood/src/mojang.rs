@@ -61,8 +61,17 @@ impl VersionJson {
     /// Apply a loader profile on top of its parent: the child's main class and arguments win,
     /// libraries are combined with the child's first, everything else comes from the parent.
     pub fn merge(parent: Self, child: Self) -> Self {
+        // One jar per group:artifact(:classifier), the loader's version winning: duplicates on the
+        // module path make the newer loaders refuse to start.
         let mut libraries = child.libraries;
-        libraries.extend(parent.libraries);
+        for library in parent.libraries {
+            if !libraries
+                .iter()
+                .any(|l| library_key(&l.name) == library_key(&library.name))
+            {
+                libraries.push(library);
+            }
+        }
         let arguments = match (parent.arguments, child.arguments) {
             (Some(mut base), Some(extra)) => {
                 base.game.extend(extra.game);
@@ -256,6 +265,15 @@ pub struct JavaDownloads {
     pub raw: FileRef,
 }
 
+/// `group:artifact[:classifier]` of a Maven coordinate, ignoring the version.
+fn library_key(name: &str) -> String {
+    let mut parts = name.split(':');
+    let group = parts.next().unwrap_or_default();
+    let artifact = parts.next().unwrap_or_default();
+    let classifier = parts.nth(1).unwrap_or_default();
+    format!("{group}:{artifact}:{classifier}")
+}
+
 /// Relative path of a Maven coordinate such as `org.lwjgl:lwjgl:3.3.3:natives-macos`.
 pub fn maven_path(name: &str) -> Option<String> {
     let mut parts = name.split(':');
@@ -271,6 +289,22 @@ pub fn maven_path(name: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn library_keys_ignore_versions() {
+        assert_eq!(
+            library_key("org.apache.commons:commons-lang3:3.14.0"),
+            "org.apache.commons:commons-lang3:"
+        );
+        assert_eq!(
+            library_key("org.lwjgl:lwjgl:3.3.3:natives-macos"),
+            "org.lwjgl:lwjgl:natives-macos"
+        );
+        assert_ne!(
+            library_key("org.lwjgl:lwjgl:3.3.3:natives-macos"),
+            library_key("org.lwjgl:lwjgl:3.3.3")
+        );
+    }
 
     #[test]
     fn maven_paths() {
