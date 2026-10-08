@@ -17,3 +17,6 @@ apps/windows/**/obj/
 
 # Build output
 dist/
+
+# Claude desktop session config
+.claude/

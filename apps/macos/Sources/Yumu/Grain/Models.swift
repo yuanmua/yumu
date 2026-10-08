@@ -142,6 +142,7 @@ struct Crash: Decodable, Hashable, Sendable {
 
 struct GameExited: Decodable, Sendable {
     let instanceId: String
+    let pid: Int32?
     let code: Int?
     let crash: Crash?
     let logPath: String?
@@ -199,7 +200,7 @@ struct TaskRef: Decodable, Sendable { let taskId: String }
 struct TaskProgress: Decodable, Sendable { let taskId: String; let bytesDone: UInt64; let bytesTotal: UInt64 }
 struct TaskCompleted<R: Decodable & Sendable>: Decodable, Sendable { let taskId: String; let result: R }
 struct TaskFailed: Decodable, Sendable { let taskId: String; let error: GrainError }
-struct GameEvent: Decodable, Sendable { let instanceId: String }
+struct GameEvent: Decodable, Sendable { let instanceId: String; let pid: Int32? }
 
 /// A scalar from an error's `args`; nested values are not needed for messages.
 enum JSONValue: Decodable, Sendable, Hashable, CustomStringConvertible {

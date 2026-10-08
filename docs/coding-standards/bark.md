@@ -7,15 +7,19 @@ Bark 是 Yumu 的视觉与动效单一真相，目标是让 macOS 与 Windows �
 ```
 bark/
 ├── tokens/
-│   ├── color.json       语义色：background、surface、accent、text、danger 等，分 light/dark
+│   ├── color.json       语义色：background、surface、accent、text、status，分 light/dark
 │   ├── space.json       间距刻度 4、8、12、16、24、32、48
 │   ├── radius.json      圆角 6、10、14、20
 │   ├── type.json        字号与字重刻度，字体由平台决定
+│   ├── elevation.json   阴影层级 flat、raised、overlay，分 light/dark
 │   └── motion.json      时长与缓动曲线
 ├── i18n/                翻译源，见 i18n.md
-├── codegen/             生成 Swift 与 C# 常量
-└── guidelines.md        布局与交互原则
+├── codegen/             生成 Swift 与 C# 常量；Swift 侧产出 Bark.Space / Radius / Motion / Colors / Text
+├── guidelines.md        界面规范：窗口结构、页面清单、渐进披露、组件、动效、文案、平台映射
+└── preview/index.html   规范的可交互演示，浏览器直接打开
 ```
+
+布局、组件、动效、文案的完整规范在 [`bark/guidelines.md`](../../bark/guidelines.md)，本文只管令牌本身。
 
 ## 2. 令牌原则
 

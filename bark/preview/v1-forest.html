@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yumu · 方案一 森林</title>
+<link rel="stylesheet" href="shared.css?v=3">
+<style>
+:root {
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Noto Sans CJK SC", sans-serif;
+  --type-body: 13px;
+  --radius-sm: 8px; --radius-md: 10px; --radius-lg: 14px; --radius-xl: 20px;
+  --bg-canvas: #F5F2EC; --bg-sidebar: #ECE8E0; --surface-default: #FFFFFF; --surface-elevated: #FFFFFF; --surface-sunken: #ECE8E1;
+  --surface-hover: rgba(0,0,0,.045); --surface-pressed: rgba(0,0,0,.08);
+  --border-subtle: rgba(0,0,0,.07); --border-strong: rgba(0,0,0,.16);
+  --text-primary: #1B1A17; --text-secondary: #6A665E; --text-tertiary: #9A958B;
+  --success: #2F8A5A; --warning: #C6882A; --danger: #C9453B;
+  --elev-raised: 0 1px 2px rgba(0,0,0,.05), 0 4px 14px rgba(0,0,0,.06);
+  --elev-overlay: 0 2px 6px rgba(0,0,0,.08), 0 18px 50px rgba(0,0,0,.18);
+  --primary-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+[data-theme="dark"] {
+  --bg-canvas: #1A1917; --bg-sidebar: #141311; --surface-default: #232220; --surface-elevated: #2B2A27; --surface-sunken: #141311;
+  --surface-hover: rgba(255,255,255,.05); --surface-pressed: rgba(255,255,255,.09);
+  --border-subtle: rgba(255,255,255,.08); --border-strong: rgba(255,255,255,.16);
+  --text-primary: #F1EFEA; --text-secondary: #A3A098; --text-tertiary: #6C6963;
+  --success: #4FB57D; --warning: #E0A94A; --danger: #E26B61;
+  --elev-raised: 0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.35);
+  --elev-overlay: 0 2px 6px rgba(0,0,0,.5), 0 18px 50px rgba(0,0,0,.6);
+}
+[data-density="compact"] { --type-body: 12px; }
+
+.app { position: fixed; inset: 0; display: grid; grid-template-columns: 268px 1fr; background: var(--bg-canvas); overflow: hidden; }
+.app[data-frame="win"] { font-family: "Segoe UI Variable Text", "Segoe UI", var(--font); }
+.app[data-frame="linux"] { font-family: Cantarell, Inter, var(--font); }
+
+/* 侧栏 */
+.sidebar { background: var(--bg-sidebar); display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--border-subtle); }
+.sb-top { height: 52px; display: flex; align-items: center; padding: 0 16px; gap: 8px; -webkit-app-region: drag; }
+.lights { display: flex; gap: 8px; }
+.lights i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.15); }
+.lights i:nth-child(2) { background: #febc2e; } .lights i:nth-child(3) { background: #28c840; }
+.app:not([data-frame="mac"]) .lights { display: none; }
+.sb-brand { display: none; align-items: center; gap: 8px; font-weight: 600; }
+.sb-brand i { width: 20px; height: 20px; border-radius: 6px; background: var(--accent); color: #fff; display: grid; place-items: center; }
+.app:not([data-frame="mac"]) .sb-brand { display: flex; }
+.sb-search { padding: 0 12px 8px; }
+.sb-list { flex: 1; overflow: auto; padding: 4px 10px 10px; display: flex; flex-direction: column; gap: 2px; }
+.sb-head { font-size: 11px; font-weight: 600; color: var(--text-tertiary); letter-spacing: .05em; padding: 14px 10px 6px; display: flex; align-items: center; gap: 6px; }
+.sb-head .count { margin-left: auto; font-weight: 500; }
+.sb-row { display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 8px; border-radius: var(--radius-md); cursor: default; user-select: none; position: relative; transition: background var(--motion-quick); }
+.sb-row:hover { background: var(--surface-hover); }
+.sb-row.on { background: var(--accent-tint); }
+.sb-row .thumb { width: 34px; height: 34px; border-radius: 9px; background-size: cover; background-position: center; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+[data-density="compact"] .sb-row { height: 38px; } [data-density="compact"] .sb-row .thumb { width: 26px; height: 26px; border-radius: 7px; }
+.sb-row .texts { flex: 1; min-width: 0; line-height: 1.25; }
+.sb-row .texts span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+.sb-row .texts small { color: var(--text-secondary); font-size: 11px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-row.running small { color: var(--success); font-variant-numeric: tabular-nums; }
+.sb-row .stop { opacity: 0; transition: opacity var(--motion-quick); }
+.sb-row:hover .stop { opacity: 1; }
+.sb-row:hover .dot { display: none; }
+.sb-row .stop:hover { color: var(--danger); }
+.sb-bottom { padding: 10px; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border-subtle); }
+.sb-actions { display: flex; gap: 6px; }
+.sb-actions .btn { flex: 1; }
+.account-bar { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: var(--radius-md); cursor: pointer; transition: background var(--motion-quick); position: relative; }
+.account-bar:hover { background: var(--surface-hover); }
+.account-bar .avatar { width: 30px; height: 30px; border-radius: 8px; overflow: hidden; flex: none; }
+.account-bar .texts { flex: 1; min-width: 0; line-height: 1.2; }
+.account-bar .texts small { color: var(--text-secondary); font-size: 11px; }
+.import-status { margin: 0 0 4px; padding: 10px 12px; background: var(--surface-default); border-radius: var(--radius-md); display: grid; gap: 6px; font-size: 11px; color: var(--text-secondary); box-shadow: var(--elev-raised); }
+
+/* 主区 */
+.main { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.main-toolbar { position: absolute; top: 0; right: 0; left: 0; height: 52px; display: flex; align-items: center; justify-content: flex-end; padding: 0 12px; gap: 4px; z-index: 5; -webkit-app-region: drag; }
+.main-toolbar .btn { -webkit-app-region: no-drag; }
+.main-toolbar.over { color: #fff; }
+.main-toolbar.over .btn.icon { color: rgba(255,255,255,.85); }
+.main-toolbar.over .btn.icon:hover { color: #fff; background: rgba(255,255,255,.14); }
+.running-pill { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 8px; border-radius: 999px; background: var(--surface-elevated); box-shadow: var(--elev-raised); font-size: 12px; font-weight: 500; margin-right: 8px; cursor: pointer; }
+.main-toolbar.over .running-pill { background: rgba(0,0,0,.35); color: #fff; backdrop-filter: blur(10px); box-shadow: none; }
+.wincontrols { display: none; gap: 2px; margin-left: 8px; }
+.wincontrols i { width: 40px; height: 30px; display: grid; place-items: center; color: inherit; border-radius: 4px; font-size: 11px; }
+.wincontrols i:last-child:hover { background: #c42b1c; color: #fff; }
+.app[data-frame="win"] .wincontrols { display: flex; }
+.gnome { display: none; margin-left: 8px; }
+.gnome i { width: 24px; height: 24px; border-radius: 50%; background: rgba(128,128,128,.25); display: grid; place-items: center; font-size: 11px; }
+.app[data-frame="linux"] .gnome { display: flex; }
+.scroll { flex: 1; overflow: auto; min-height: 0; position: relative; }
+
+/* 实例页：封面头 */
+.hero { position: relative; height: 272px; background-size: cover; background-position: center; image-rendering: pixelated; }
+.hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.25) 0%, rgba(0,0,0,0) 35%, color-mix(in srgb, var(--bg-canvas) 0%, transparent) 55%, var(--bg-canvas) 100%); }
+.hero-inner { position: absolute; left: 32px; right: 32px; bottom: 0; display: flex; align-items: flex-end; gap: 20px; z-index: 1; }
+.hero .art { width: 104px; height: 104px; border-radius: 24px; background-size: cover; background-position: center; image-rendering: pixelated; box-shadow: 0 10px 30px rgba(0,0,0,.3), inset 0 0 0 1px rgba(255,255,255,.3); border: 3px solid var(--bg-canvas); flex: none; }
+.hero .texts { flex: 1; min-width: 0; padding-bottom: 4px; }
+.hero .name { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; display: flex; align-items: center; gap: 10px; }
+.hero .name .fav { color: var(--warning); cursor: pointer; }
+.hero .chips { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
+.hero .chips .tag { height: 24px; padding: 0 9px; font-size: 12px; background: var(--surface-elevated); box-shadow: var(--elev-raised); color: var(--text-primary); }
+.hero .chips .tag svg { color: var(--text-secondary); }
+.hero .actions { display: flex; align-items: center; gap: 8px; padding-bottom: 10px; }
+.hero .actions .btn.icon { height: 48px; width: 44px; background: var(--surface-elevated); box-shadow: var(--elev-raised); border-radius: var(--radius-lg); color: var(--text-primary); }
+.page { padding: 0 32px 48px; }
+.page .tabs { position: sticky; top: 0; background: var(--bg-canvas); z-index: 3; margin-top: 18px; }
+.tabbody { padding-top: 24px; position: relative; }
+
+/* 概览 */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.stat { background: var(--surface-default); border-radius: var(--radius-lg); padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; box-shadow: inset 0 0 0 1px var(--border-subtle); }
+.stat small { color: var(--text-secondary); display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.stat b { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.stat b em { font-style: normal; font-size: 13px; color: var(--text-tertiary); font-weight: 500; margin-left: 4px; }
+.section { margin-top: 28px; }
+.section-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+.section-head h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.section-head small { color: var(--text-tertiary); }
+.section-head .btn { margin-left: auto; }
+.worlds { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.world { background: var(--surface-default); border-radius: var(--radius-lg); overflow: hidden; box-shadow: inset 0 0 0 1px var(--border-subtle); transition: transform var(--motion-quick), box-shadow var(--motion-quick); cursor: pointer; }
+.world:hover { transform: translateY(-2px); box-shadow: var(--elev-raised), inset 0 0 0 1px var(--border-subtle); }
+.world .cover { height: 96px; background-size: cover; background-position: center; image-rendering: pixelated; }
+.world .body { padding: 12px 14px; display: flex; align-items: center; gap: 10px; }
+.world .body b { display: block; font-weight: 600; }
+.world .body small { color: var(--text-secondary); font-size: 11px; }
+.world .body .btn { margin-left: auto; }
+.world.add { display: grid; place-items: center; min-height: 160px; color: var(--text-tertiary); border: 1.5px dashed var(--border-strong); background: transparent; box-shadow: none; }
+.quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.quick button { appearance: none; border: 0; background: var(--surface-default); box-shadow: inset 0 0 0 1px var(--border-subtle); border-radius: var(--radius-lg); padding: 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; cursor: pointer; color: var(--text-primary); transition: background var(--motion-quick), transform var(--motion-quick); text-align: left; }
+.quick button:hover { background: var(--surface-elevated); transform: translateY(-1px); box-shadow: var(--elev-raised); }
+.quick button svg { color: var(--accent); }
+.quick button small { color: var(--text-secondary); font-size: 11px; }
+.notice { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: var(--radius-lg); background: var(--danger-tint); color: var(--text-primary); margin-bottom: 18px; }
+.notice svg { color: var(--danger); flex: none; }
+.notice .texts { flex: 1; } .notice b { display: block; } .notice small { color: var(--text-secondary); }
+.activity { display: flex; flex-direction: column; }
+.activity .item { display: flex; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border-subtle); align-items: center; }
+.activity .item:first-child { border: 0; }
+.activity .item svg { color: var(--text-tertiary); } .activity .item small { margin-left: auto; color: var(--text-tertiary); }
+
+/* 模组 */
+.modbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.modbar .field { flex: 1; max-width: 320px; }
+.modlist { display: flex; flex-direction: column; gap: 4px; }
+.mrow { display: flex; align-items: center; gap: 12px; height: 46px; padding: 0 12px; border-radius: var(--radius-md); background: var(--surface-default); box-shadow: inset 0 0 0 1px var(--border-subtle); }
+.mrow .mi { width: 28px; height: 28px; border-radius: 7px; background: var(--accent-tint); color: var(--accent); display: grid; place-items: center; flex: none; }
+.mrow .texts { flex: 1; min-width: 0; line-height: 1.25; } .mrow .texts b { font-weight: 500; display: block; } .mrow .texts small { color: var(--text-secondary); font-size: 11px; }
+.mrow .tag { margin-right: 4px; }
+.mrow .btn.icon { opacity: 0; } .mrow:hover .btn.icon { opacity: 1; }
+.twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.group { background: var(--surface-default); border-radius: var(--radius-lg); box-shadow: inset 0 0 0 1px var(--border-subtle); overflow: hidden; }
+.group .ghead { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); font-weight: 600; }
+.group .ghead .btn { margin-left: auto; }
+.group .gempty { padding: 28px; text-align: center; color: var(--text-tertiary); }
+.group .mrow { box-shadow: none; border-radius: 0; border-bottom: 1px solid var(--border-subtle); }
+
+/* 日志 */
+.console { background: #141311; color: #d7d3cb; border-radius: var(--radius-lg); padding: 16px 18px; font: 12px/1.7 ui-monospace, "SF Mono", Menlo, Consolas, monospace; max-height: 420px; overflow: auto; white-space: pre; }
+.console .i { color: #8fa9c6; } .console .w { color: #e0a94a; } .console .e { color: #e26b61; }
+.logbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+
+/* 整合包页 */
+.packs-head { padding: 52px 32px 0; }
+.packs-head h1 { margin: 0 0 4px; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+.packs-head p { margin: 0 0 18px; color: var(--text-secondary); }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { height: 28px; padding: 0 12px; border-radius: 999px; background: var(--surface-default); box-shadow: inset 0 0 0 1px var(--border-subtle); color: var(--text-secondary); font-weight: 500; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border: 0; transition: all var(--motion-quick); }
+.chip.on, .chip:hover { background: var(--accent-tint); color: var(--accent); box-shadow: none; }
+.packgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; padding: 20px 32px 48px; }
+.pack { background: var(--surface-default); border-radius: var(--radius-lg); overflow: hidden; box-shadow: inset 0 0 0 1px var(--border-subtle); transition: transform var(--motion-quick), box-shadow var(--motion-quick); }
+.pack:hover { transform: translateY(-2px); box-shadow: var(--elev-raised), inset 0 0 0 1px var(--border-subtle); }
+.pack .cover { height: 120px; background-size: cover; background-position: center; image-rendering: pixelated; position: relative; }
+.pack .cover .tags { position: absolute; left: 10px; bottom: 10px; display: flex; gap: 4px; }
+.pack .cover .tag { background: rgba(0,0,0,.45); color: #fff; backdrop-filter: blur(6px); }
+.pack .body { padding: 14px 16px 16px; }
+.pack .body b { font-size: 15px; display: block; }
+.pack .body small { color: var(--text-secondary); display: block; margin-top: 2px; }
+.pack .body p { margin: 8px 0 12px; color: var(--text-secondary); font-size: 12px; min-height: 34px; }
+.pack .body .row { display: flex; align-items: center; gap: 6px; }
+.pack .body .row .btn { margin-left: auto; }
+
+/* 设置页 */
+.settings { display: grid; grid-template-columns: 200px 1fr; height: 100%; }
+.settings nav { padding: 60px 12px 16px; border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 2px; }
+.settings nav h2 { margin: 0 10px 14px; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.settings nav button { appearance: none; border: 0; background: transparent; display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: var(--radius-md); color: var(--text-secondary); cursor: pointer; font-weight: 500; transition: background var(--motion-quick), color var(--motion-quick); text-align: left; }
+.settings nav button svg { color: var(--text-tertiary); }
+.settings nav button:hover { background: var(--surface-hover); color: var(--text-primary); }
+.settings nav button.on { background: var(--accent-tint); color: var(--accent); } .settings nav button.on svg { color: var(--accent); }
+.settings .content { padding: 60px 40px 48px; overflow: auto; }
+.settings .content h2 { margin: 0 0 18px; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+
+/* 欢迎页与空状态 */
+.welcome { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 32px; text-align: center; gap: 28px; position: relative; overflow: hidden; }
+.welcome .collage { display: flex; gap: 10px; }
+.welcome .collage i { width: 120px; height: 76px; border-radius: 14px; background-size: cover; image-rendering: pixelated; box-shadow: var(--elev-raised); transform: rotate(var(--r)); display: block; animation: rowIn var(--motion-emphasized) both; }
+.welcome h1 { margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -0.02em; }
+.welcome p { margin: 0; color: var(--text-secondary); max-width: 440px; font-size: 15px; }
+.steps { display: grid; grid-template-columns: repeat(3, 220px); gap: 12px; }
+.step { background: var(--surface-default); border-radius: var(--radius-lg); padding: 18px; text-align: left; box-shadow: inset 0 0 0 1px var(--border-subtle); display: flex; flex-direction: column; gap: 8px; }
+.step .n { width: 26px; height: 26px; border-radius: 8px; background: var(--accent-tint); color: var(--accent); display: grid; place-items: center; font-weight: 600; font-size: 12px; }
+.step b { font-size: 14px; } .step small { color: var(--text-secondary); }
+.step.done .n { background: var(--success); color: #fff; }
+.empty { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 14px; padding: 40px; }
+.empty .art { width: 96px; height: 96px; border-radius: 24px; background: var(--surface-sunken); display: grid; place-items: center; color: var(--text-tertiary); }
+.empty h2 { margin: 0; font-size: 22px; font-weight: 700; } .empty p { margin: 0; color: var(--text-secondary); max-width: 380px; }
+.empty .hint { color: var(--text-tertiary); font-size: 12px; }
+
+/* 账号弹层 */
+.popover { position: absolute; left: 10px; bottom: 60px; z-index: 60; width: 248px; background: var(--surface-elevated); border-radius: var(--radius-lg); box-shadow: var(--elev-overlay), inset 0 0 0 1px var(--border-subtle); padding: 6px; transform-origin: bottom left; animation: menuIn var(--motion-standard) both; }
+.popover .prow { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: var(--radius-md); cursor: pointer; }
+.popover .prow:hover { background: var(--surface-hover); }
+.popover .prow .avatar { width: 32px; height: 32px; border-radius: 8px; overflow: hidden; }
+.popover .prow .texts { flex: 1; line-height: 1.2; } .popover .prow small { color: var(--text-secondary); font-size: 11px; }
+.popover hr { border: 0; border-top: 1px solid var(--border-subtle); margin: 4px 8px; }
+
+/* 运行中弹层 */
+.runpop { position: absolute; top: 48px; right: 12px; z-index: 60; width: 300px; background: var(--surface-elevated); border-radius: var(--radius-lg); box-shadow: var(--elev-overlay), inset 0 0 0 1px var(--border-subtle); padding: 6px; animation: menuIn var(--motion-standard) both; transform-origin: top right; }
+.runpop .prow { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: var(--radius-md); }
+.runpop .prow:hover { background: var(--surface-hover); }
+.runpop .thumb { width: 32px; height: 32px; border-radius: 8px; background-size: cover; image-rendering: pixelated; }
+.runpop .texts { flex: 1; line-height: 1.2; } .runpop .texts small { color: var(--success); font-size: 11px; font-variant-numeric: tabular-nums; }
+.runpop .head { padding: 8px 10px 4px; font-size: 11px; font-weight: 600; color: var(--text-tertiary); letter-spacing: .05em; }
+</style>
+</head>
+<body>
+<div class="app" id="app" data-frame="mac">
+  <aside class="sidebar">
+    <div class="sb-top"><div class="lights"><i></i><i></i><i></i></div><div class="sb-brand"><i data-icon="cube" data-size="12"></i>Yumu</div></div>
+    <div class="sb-search"><div class="field"><span data-icon="search"></span><input placeholder="搜索实例" id="sbSearch"></div></div>
+    <div class="sb-list" id="sbList"></div>
+    <div class="sb-bottom">
+      <div id="importSlot"></div>
+      <div class="sb-actions"><button class="btn" id="sbNew"><span data-icon="plus"></span>新建</button><button class="btn" id="sbPacks"><span data-icon="package"></span>整合包</button><button class="btn icon" id="sbSettings" title="设置"><span data-icon="gear"></span></button></div>
+      <div class="account-bar" id="accountBar"></div>
+    </div>
+  </aside>
+  <main class="main" id="main">
+    <div class="main-toolbar" id="toolbar"></div>
+    <div class="scroll" id="scroll"></div>
+    <div id="overlays"></div>
+  </main>
+</div>
+<script src="shared.js?v=3"></script>
+<script>
+const state = { selected: 'survival', tab: 'overview', activity: {}, running: {}, crash: null, importing: null, settingsSection: 'general', welcomeDone: true };
+const instances = DATA.instances;
+const current = () => instances.find(i => i.id === state.selected);
+const main = $('#main'), overlays = $('#overlays'), scroll = $('#scroll'), toolbar = $('#toolbar');
+
+/* ---------- 侧栏 ---------- */
+function elapsed(id) { const s = Math.floor((Date.now() - state.running[id]) / 1000); const m = Math.floor(s / 60), h = Math.floor(m / 60); return h ? `${h} 小时 ${m % 60} 分` : `${m} 分 ${String(s % 60).padStart(2, '0')} 秒`; }
+function sbRow(ins, extra = '') {
+  const act = state.activity[ins.id], running = state.running[ins.id];
+  const sub = running ? `运行中 · ${elapsed(ins.id)}` : act === 'preparing' ? '准备中…' : act === 'installing' ? '正在安装…' : `${ins.loader || '原版'} · ${ins.version}`;
+  const right = running ? `<span class="dot success breathe"></span><button class="btn icon stop" title="结束游戏" data-stop="${ins.id}">${icon('stop', 14)}</button>` : act ? '<span class="spinner"></span>' : ins.favorite ? `<span style="color:var(--warning)">${icon('starFill', 12)}</span>` : '';
+  return `<div class="sb-row ${ins.id === state.selected && location.hash.startsWith('#/instance') ? 'on' : ''} ${running ? 'running' : ''} ${extra}" data-id="${ins.id}">
+    ${SETTINGS.sidebarCovers ? `<div class="thumb" style="background-image:${cover(ins.id, ins.biome, 8, 8)}"></div>` : `<span style="color:var(--accent)">${icon(ins.loader ? 'puzzle' : 'cube')}</span>`}
+    <div class="texts"><span>${ins.name}</span><small>${sub}</small></div>${right}</div>`;
+}
+function renderSidebar(opts = {}) {
+  const q = ($('#sbSearch').value || '').trim();
+  const list = instances.filter(i => !q || i.name.includes(q));
+  const running = list.filter(i => state.running[i.id]);
+  const fav = list.filter(i => i.favorite && !state.running[i.id]);
+  const rest = list.filter(i => !i.favorite && !state.running[i.id]);
+  let html = '';
+  if (running.length) html += `<div class="sb-head"><span class="dot success breathe"></span>正在运行<span class="count">${running.length}</span></div>` + running.map(i => sbRow(i)).join('');
+  if (fav.length) html += `<div class="sb-head">收藏</div>` + fav.map(i => sbRow(i)).join('');
+  if (rest.length) html += `<div class="sb-head">${fav.length || running.length ? '其他' : '全部'}<span class="count">${rest.length}</span></div>` + rest.map((i, n) => sbRow(i, opts.initial ? 'enter' : '')).join('');
+  if (!list.length) html += `<div style="padding:24px 12px;color:var(--text-tertiary);text-align:center">${q ? '没有匹配的实例' : '还没有实例'}</div>`;
+  $('#sbList').innerHTML = html;
+  $$('.sb-row', $('#sbList')).forEach((r, n) => {
+    if (opts.initial) r.style.animationDelay = Math.min(n, 6) * 20 + 'ms';
+    r.onclick = e => { if (e.target.closest('[data-stop]')) return; go('/instance/' + r.dataset.id); };
+    r.oncontextmenu = e => { e.preventDefault(); contextMenu(e, instances.find(i => i.id === r.dataset.id)); };
+  });
+  $$('[data-stop]', $('#sbList')).forEach(b => b.onclick = () => stop(b.dataset.stop));
+  if (opts.enter) { const r = $(`.sb-row[data-id="${opts.enter}"]`); r && r.classList.add('enter', 'pop'); }
+  const acc = DATA.accounts.find(a => a.active);
+  $('#accountBar').innerHTML = `<div class="avatar">${face(acc.id, 30)}</div><div class="texts"><div>${acc.name}</div><small>${acc.kind}</small></div><span data-icon="chevronDown" style="color:var(--text-tertiary)"></span>`;
+  hydrateIcons($('#accountBar'));
+}
+$('#sbSearch').oninput = () => renderSidebar();
+setInterval(() => { if (Object.keys(state.running).length) { $$('.sb-row.running', $('#sbList')).forEach(r => { r.querySelector('small').textContent = `运行中 · ${elapsed(r.dataset.id)}`; }); $$('.runpop .texts small').forEach(s => s.textContent = `运行中 · ${elapsed(s.dataset.id)}`); } }, 1000);
+
+/* ---------- 工具栏 ---------- */
+function renderToolbar(over) {
+  const n = Object.keys(state.running).length;
+  toolbar.className = 'main-toolbar' + (over ? ' over' : '');
+  toolbar.innerHTML = `${n ? `<button class="running-pill" id="runPill"><span class="dot success breathe"></span>${n} 个实例运行中</button>` : ''}
+    <button class="btn icon" title="导入整合包" id="tbImport">${icon('import')}</button>
+    <button class="btn icon" title="新建实例" id="tbNew">${icon('plus')}</button>
+    <div class="wincontrols"><i>&#x2500;</i><i>&#x25A1;</i><i>&#x2715;</i></div><div class="gnome"><i>&#x2715;</i></div>`;
+  $('#tbImport').onclick = simulateDrop; $('#tbNew').onclick = openNew;
+  const pill = $('#runPill'); if (pill) pill.onclick = () => {
+    if ($('.runpop', overlays)) { $('.runpop', overlays).remove(); return; }
+    const p = el(`<div class="runpop"><div class="head">正在运行</div>${Object.keys(state.running).map(id => { const i = instances.find(x => x.id === id); return `<div class="prow"><div class="thumb" style="background-image:${cover(i.id, i.biome, 8, 8)}"></div><div class="texts"><div>${i.name}</div><small data-id="${id}">运行中 · ${elapsed(id)}</small></div><button class="btn quiet" data-go="${id}">查看</button><button class="btn icon" data-stop="${id}" title="结束游戏">${icon('stop', 14)}</button></div>`; }).join('')}</div>`);
+    overlays.appendChild(p);
+    $$('[data-go]', p).forEach(b => b.onclick = () => { p.remove(); go('/instance/' + b.dataset.go); });
+    $$('[data-stop]', p).forEach(b => b.onclick = () => { p.remove(); stop(b.dataset.stop); });
+    setTimeout(() => document.addEventListener('pointerdown', function h(e) { if (!p.contains(e.target) && e.target !== pill) { p.remove(); document.removeEventListener('pointerdown', h); } }), 0);
+  };
+}
+
+/* ---------- 路由 ---------- */
+let currentPage = null;
+function mount(html, cls = '') {
+  const old = scroll.firstElementChild;
+  if (old) { old.classList.add('out'); setTimeout(() => old.remove(), 320); }
+  const page = el(`<div class="pane ${cls}" style="min-height:100%">${html}</div>`);
+  scroll.appendChild(page); scroll.scrollTop = 0; hydrateIcons(page); bindSwitches(page);
+  return page;
+}
+
+/* ---------- 实例页 ---------- */
+const TABS = [['overview', '概览'], ['mods', '模组'], ['resources', '资源'], ['worlds', '存档'], ['logs', '日志'], ['settings', '设置']];
+function renderInstance() {
+  const ins = current(); renderToolbar(true);
+  const page = mount(`
+    <div class="hero" style="background-image:${cover(ins.id, ins.biome, 48, 16)}">
+      <div class="hero-inner">
+        <div class="art" style="background-image:${cover(ins.id, ins.biome, 8, 8)}"></div>
+        <div class="texts">
+          <div class="name">${ins.name}<span class="fav" data-fav title="${ins.favorite ? '取消收藏' : '收藏'}">${icon(ins.favorite ? 'starFill' : 'star', 20)}</span></div>
+          <div class="chips">
+            <span class="tag">${icon(ins.loader ? 'puzzle' : 'cube', 12)}${ins.loader ? `${ins.loader} ${ins.loaderVersion}` : '原版'}</span>
+            <span class="tag">${icon('tag', 12)}${ins.version}</span>
+            ${ins.mods.length ? `<span class="tag">${icon('layers', 12)}${ins.mods.length} 个模组</span>` : ''}
+            <span class="tag">${icon('clock', 12)}${ins.playtime}</span>
+            <span id="heroStatus"></span>
+          </div>
+        </div>
+        <div class="actions"><span id="heroAction"></span><button class="btn icon" id="heroMore" title="更多">${icon('more', 18)}</button></div>
+      </div>
+    </div>
+    <div class="page">
+      <div class="tabs" id="tabs">${TABS.map(([id, n]) => `<button aria-selected="${state.tab === id}" data-tab="${id}">${n}${id === 'mods' && ins.mods.length ? `<span class="count">${ins.mods.length}</span>` : ''}${id === 'worlds' && ins.worlds.length ? `<span class="count">${ins.worlds.length}</span>` : ''}</button>`).join('')}<div class="thumb"></div></div>
+      <div class="tabbody" id="tabbody"></div>
+    </div>`);
+  segmented($('#tabs', page), b => { state.tab = b.dataset.tab; history.replaceState(null, '', `#/instance/${ins.id}/${state.tab}`); renderTab(page, true); });
+  renderTab(page, false); renderHeroStatus(page);
+  $('[data-fav]', page).onclick = () => { ins.favorite = !ins.favorite; renderInstance(); };
+  $('#heroMore', page).onclick = e => { const r = e.currentTarget.getBoundingClientRect(); menu(main, r.right - 200, r.bottom + 6, moreItems(ins)); };
+}
+function renderHeroStatus(page) {
+  const ins = current(); const act = state.activity[ins.id], running = state.running[ins.id];
+  const st = $('#heroStatus', page), ac = $('#heroAction', page); if (!st) return;
+  st.innerHTML = running ? `<span class="tag success"><span class="dot success breathe"></span>运行中 · ${elapsed(ins.id)}</span>` : act === 'installing' ? `<span class="tag"><span class="spinner" style="width:10px;height:10px"></span><span id="instNum">正在安装…</span></span>` : act === 'preparing' ? `<span class="tag"><span class="spinner" style="width:10px;height:10px"></span>准备中…</span>` : state.crash === ins.id ? `<span class="tag danger">${icon('warning', 12)}上次运行崩溃</span>` : '';
+  ac.innerHTML = running ? `<button class="btn xl stopping" id="playBtn">${icon('stop', 18)}结束游戏</button>` : `<button class="btn primary xl" id="playBtn" ${act ? 'disabled' : ''}>${icon('play', 18)}开始游戏</button>`;
+  $('#playBtn', page).onclick = () => running ? stop(ins.id) : play(ins.id);
+}
+function renderTab(page, animate) {
+  const ins = current(); const body = $('#tabbody', page); const old = body.firstElementChild;
+  if (old) { if (animate) { old.classList.add('out'); setTimeout(() => old.remove(), 320); } else old.remove(); }
+  const t = state.tab; let html = '';
+  if (t === 'overview') html = `
+    ${state.crash === ins.id ? `<div class="notice">${icon('warning', 22)}<div class="texts"><b>上次运行因内存不足退出</b><small>游戏在加载区块时耗尽了 2 GB 内存。把内存调到 4 GB 通常能解决。</small></div><button class="btn primary">把内存调到 4 GB</button><button class="btn" data-tab-go="logs">查看日志</button></div>` : ''}
+    <div class="stats">
+      <div class="stat"><small>${icon('clock', 13)}游玩时长</small><b>${ins.hours}<em>小时</em></b></div>
+      <div class="stat"><small>${icon('calendar', 13)}上次游玩</small><b style="font-size:17px;padding:3px 0">${ins.lastPlayed}</b></div>
+      <div class="stat"><small>${icon('world', 13)}存档</small><b>${ins.worlds.length}<em>个</em></b></div>
+      <div class="stat"><small>${icon('layers', 13)}模组</small><b>${ins.mods.length}<em>个${ins.mods.length ? ' · 2 个可更新' : ''}</em></b></div>
+    </div>
+    <div class="section"><div class="section-head"><h3>存档</h3><small>${ins.worlds.length ? '点一个直接进入世界' : ''}</small><button class="btn" data-tab-go="worlds">全部</button></div>
+      <div class="worlds">${ins.worlds.slice(0, 3).map(w => worldCard(ins, w)).join('')}<div class="world add">${icon('plus', 20)}<span style="margin-top:-80px;font-size:12px">新建世界</span></div></div></div>
+    <div class="section"><div class="section-head"><h3>快速操作</h3></div>
+      <div class="quick">
+        <button>${icon('folder', 18)}<b>打开文件夹</b><small>.minecraft 目录</small></button>
+        <button>${icon('package', 18)}<b>导出整合包</b><small>生成 .mrpack 分享</small></button>
+        <button>${icon('copy', 18)}<b>复制实例</b><small>连模组一起复制</small></button>
+        <button>${icon('refresh', 18)}<b>修复文件</b><small>校验并重新下载损坏文件</small></button>
+      </div></div>
+    <div class="section"><div class="section-head"><h3>最近</h3></div>
+      <div class="activity">
+        <div class="item">${icon('play')}<span>游玩了 2 小时 14 分</span><small>${ins.lastPlayed}</small></div>
+        <div class="item">${icon('download')}<span>更新了 Sodium 到 0.6.13</span><small>上周</small></div>
+        <div class="item">${icon('world')}<span>创建了世界「${ins.worlds[0]?.name || '新的世界'}」</span><small>两周前</small></div>
+      </div></div>`;
+  else if (t === 'mods') html = !ins.loader ? `<div class="group"><div class="gempty" style="display:flex;flex-direction:column;align-items:center;gap:12px"><span>这是原版实例，没有模组加载器。</span><button class="btn primary" id="toFabric">新建一个 Fabric 实例</button></div></div>` : `
+    <div class="modbar"><div class="field">${icon('search')}<input placeholder="筛选已安装的模组"></div><div class="segmented"><div class="thumb"></div><button aria-selected="true">全部</button><button>已启用</button><button>可更新 <span class="count" style="font-size:10px;background:var(--accent-tint);color:var(--accent);padding:0 5px;border-radius:8px">2</span></button></div><span style="flex:1"></span><button class="btn">${icon('refresh')}全部更新</button><button class="btn primary">${icon('plus')}添加模组</button></div>
+    <div class="modlist">${ins.mods.map((m, i) => `<div class="mrow"><div class="mi">${icon('puzzle', 14)}</div><div class="texts"><b>${m}</b><small>${['0.6.13', '0.14.9', '7.0.2', '5.21.0', '1.7.4', '2.8.0'][i % 6]} · ${ins.loader} ${ins.version}${i === 0 ? ' · 必需：Fabric API' : ''}</small></div>${i < 2 ? '<span class="tag accent">有更新</span>' : ''}<button class="btn icon" title="更多">${icon('more')}</button><button class="switch" aria-checked="${i !== 4}"></button></div>`).join('')}</div>
+    <div class="section"><div class="section-head"><h3>从 Modrinth 添加</h3><small>必需的依赖会自动一起装</small></div>
+      <div class="field large" style="margin-bottom:10px">${icon('search')}<input placeholder="搜索模组…" value="minimap"></div>
+      <div class="modlist">${['Xaero 小地图', 'JourneyMap', 'Antique Atlas'].map((m, i) => `<div class="mrow"><div class="mi" style="background:var(--surface-sunken);color:var(--text-secondary)">${icon('puzzle', 14)}</div><div class="texts"><b>${m}</b><small>${['3,100 万', '2,500 万', '240 万'][i]} 次下载 · ${ins.loader} ${ins.version} 可用</small></div>${ins.mods.includes(m) ? '<span class="tag accent">已安装</span>' : '<button class="btn">安装</button>'}</div>`).join('')}</div></div>`;
+  else if (t === 'resources') html = `<div class="twocol">
+    <div class="group"><div class="ghead">${icon('sparkle')}光影包<button class="btn">添加…</button></div>${ins.shaders.length ? ins.shaders.map(s => `<div class="mrow"><div class="mi">${icon('sparkle', 14)}</div><div class="texts"><b>${s}</b><small>r5.4 · 正在使用</small></div><button class="switch" aria-checked="true"></button></div>`).join('') : '<div class="gempty">还没有光影包。需要 Iris 或 OptiFine。</div>'}</div>
+    <div class="group"><div class="ghead">${icon('image')}资源包<button class="btn">添加…</button></div>${ins.packs.length ? ins.packs.map(s => `<div class="mrow"><div class="mi">${icon('image', 14)}</div><div class="texts"><b>${s}</b><small>1.21 · 排在最上</small></div><button class="switch" aria-checked="true"></button></div>`).join('') : '<div class="gempty">还没有资源包。</div>'}</div></div>
+    <div class="section"><div class="section-head"><h3>从 Modrinth 添加</h3></div><div class="field large">${icon('search')}<input placeholder="搜索光影包或资源包…"></div></div>`;
+  else if (t === 'worlds') html = `<div class="modbar"><span style="color:var(--text-secondary)">${ins.worlds.length} 个世界 · 共 ${ins.worlds.length ? '1.5 GB' : '0 MB'}</span><span style="flex:1"></span><button class="btn">${icon('import')}导入世界</button><button class="btn">${icon('shield')}备份全部</button></div>
+    <div class="worlds">${ins.worlds.map(w => worldCard(ins, w)).join('')}<div class="world add">${icon('plus', 20)}<span style="margin-top:-80px;font-size:12px">新建世界</span></div></div>`;
+  else if (t === 'logs') html = `<div class="logbar"><div class="field select" style="width:220px"><select><option>最近一次运行 · ${ins.lastPlayed}</option><option>上一次</option><option>崩溃报告 2026-10-06</option></select></div><div class="field" style="flex:1;max-width:260px">${icon('search')}<input placeholder="搜索日志"></div><span style="flex:1"></span><button class="btn">${icon('copy')}复制</button><button class="btn">${icon('folder')}日志目录</button></div>
+    ${state.crash === ins.id ? `<div class="notice">${icon('warning', 22)}<div class="texts"><b>崩溃报告：内存不足（OutOfMemoryError）</b><small>Yumu 识别到这是内存问题，和模组冲突无关。</small></div><button class="btn primary">把内存调到 4 GB</button></div>` : ''}
+    <div class="console"><span class="i">[22:14:03] [main/INFO]</span> Loading Minecraft ${ins.version} with ${ins.loader || 'Vanilla'} ${ins.loaderVersion}
+<span class="i">[22:14:03] [main/INFO]</span> Loading ${ins.mods.length + 3} mods:
+${ins.mods.slice(0, 5).map(m => `    - ${m.toLowerCase().replace(/[^a-z]/g, '')} 0.6.13`).join('\n')}
+<span class="i">[22:14:05] [Render thread/INFO]</span> Backend library: LWJGL version 3.3.4
+<span class="i">[22:14:05] [Render thread/INFO]</span> OpenGL 4.1 Metal - 89.4 · Apple M3 Pro
+<span class="w">[22:14:06] [Render thread/WARN]</span> Shader "complementary" requires Iris 1.8; found 1.8.1
+<span class="i">[22:14:09] [Render thread/INFO]</span> Sound engine started
+<span class="i">[22:14:11] [Server thread/INFO]</span> Preparing level "${ins.worlds[0]?.name || 'world'}"
+<span class="i">[22:14:14] [Server thread/INFO]</span> Preparing spawn area: 92%
+${state.crash === ins.id ? `<span class="e">[22:31:40] [Server thread/ERROR]</span> java.lang.OutOfMemoryError: Java heap space
+<span class="e">[22:31:40] [Server thread/ERROR]</span>     at net.minecraft.world.chunk.ChunkSection.read(ChunkSection.java:118)` : `<span class="i">[22:14:15] [Server thread/INFO]</span> Done (3.9s)! For help, type "help"`}</div>`;
+  else if (t === 'settings') html = `
+    <div class="sgroup"><h5>常规</h5>
+      <div class="srow"><div class="stexts"><b>名称</b></div><div class="scontrol"><div class="field" style="width:240px"><input value="${ins.name}"></div></div></div>
+      <div class="srow"><div class="stexts"><b>图标与封面</b><small>封面显示在页面顶部，可以用截图。</small></div><div class="scontrol"><div class="iconpick">${['forest', 'plains', 'cave', 'sky', 'nether', 'snow'].map(b => `<button class="${b === ins.biome ? 'on' : ''}" style="background-image:${cover(ins.id, b, 8, 8)}" data-biome="${b}"></button>`).join('')}<button class="custom" title="自定义图片…">${icon('image')}</button></div></div></div>
+      <div class="srow"><div class="stexts"><b>收藏</b><small>收藏的实例在侧栏置顶。</small></div><div class="scontrol"><button class="switch" aria-checked="${ins.favorite}"></button></div></div>
+    </div>
+    <div class="sgroup"><h5>游戏</h5>
+      <div class="srow"><div class="stexts"><b>窗口</b></div><div class="scontrol"><div class="field select" style="width:180px"><select><option>跟随上次</option><option>1920 × 1080</option><option>全屏</option></select></div></div></div>
+      <div class="srow"><div class="stexts"><b>开始游戏后</b></div><div class="scontrol"><div class="field select" style="width:180px"><select><option>跟随全局设置</option><option>保持 Yumu 打开</option><option>隐藏 Yumu</option></select></div></div></div>
+      <div class="srow"><div class="stexts"><b>直接进入世界</b><small>跳过主菜单，开始游戏时直接加载这个世界。</small></div><div class="scontrol"><div class="field select" style="width:180px"><select><option>不跳过</option>${ins.worlds.map(w => `<option>${w.name}</option>`).join('')}</select></div></div></div>
+    </div>
+    <div class="sgroup"><h5>Java 与内存</h5>
+      <div class="srow"><div class="stexts"><b>内存</b><small>内存越大加载越快，但不要超过物理内存的一半。这台电脑有 36 GB。</small></div><div class="scontrol"><div class="field" style="width:100px"><input value="${state.crash === ins.id ? '2 GB' : '4 GB'}"></div></div></div>
+      <div class="srow"><div class="stexts"><b>Java</b><small>自动会用 Mojang 为 ${ins.version} 指定的运行时。</small></div><div class="scontrol"><div class="field select" style="width:240px"><select>${DATA.javas.map((j, i) => `<option>${i === 0 ? '自动（' + j.name + '）' : j.name}</option>`).join('')}</select></div></div></div>
+    </div>
+    <div class="disclosure" data-open="false" style="margin-bottom:18px"><button type="button">${icon('chevron')}高级</button><div class="body-wrap"><div><div class="sgroup" style="margin-top:12px">
+      <div class="srow"><div class="stexts"><b>加载器版本</b></div><div class="scontrol"><div class="field select" style="width:180px"><select><option>${ins.loaderVersion || '——'}（已固定）</option><option>最新</option></select></div></div></div>
+      <div class="srow"><div class="stexts"><b>JVM 参数</b><small>覆盖全局设置。</small></div><div class="scontrol"><div class="field" style="width:320px"><input placeholder="留空用默认值"></div></div></div>
+      <div class="srow"><div class="stexts"><b>启动前命令</b><small>在游戏进程拉起前执行。</small></div><div class="scontrol"><div class="field" style="width:320px"><input placeholder="例如 ./sync-saves.sh"></div></div></div>
+      <div class="srow"><div class="stexts"><b>环境变量</b></div><div class="scontrol"><button class="btn">编辑…</button></div></div>
+    </div></div></div></div>
+    <div class="sgroup"><div class="srow"><div class="stexts"><b style="color:var(--danger)">删除实例</b><small>存档、模组和设置会一起删除，不能撤销。</small></div><div class="scontrol"><button class="btn danger" id="delBtn">删除实例…</button></div></div></div>`;
+  const pane = el(`<div class="pane">${html}</div>`); body.appendChild(pane);
+  hydrateIcons(pane); bindSwitches(pane); bindDisclosures(pane); bindIconPick(pane); $$('.segmented', pane).forEach(s => segmented(s));
+  $$('[data-tab-go]', pane).forEach(b => b.onclick = () => { const i = TABS.findIndex(t => t[0] === b.dataset.tabGo); $$('#tabs button', page)[i].click(); });
+  $$('[data-biome]', pane).forEach(b => b.onclick = () => { ins.biome = b.dataset.biome; renderInstance(); renderSidebar(); });
+  const f = $('#toFabric', pane); if (f) f.onclick = () => openNew('Fabric');
+  const d = $('#delBtn', pane); if (d) d.onclick = () => confirmDelete(ins);
+  $$('.world[data-world]', pane).forEach(w => w.onclick = () => !state.running[ins.id] && play(ins.id));
+}
+function worldCard(ins, w) { return `<div class="world" data-world="${w.name}"><div class="cover" style="background-image:${cover(ins.id + w.name, ins.biome, 24, 8)}"></div><div class="body"><div><b>${w.name}</b><small>${w.mode} · ${w.size} · ${w.last}</small></div><button class="btn icon" title="进入世界">${icon('play')}</button></div></div>`; }
+
+/* ---------- 整合包页 ---------- */
+function renderPacks() {
+  renderToolbar(false);
+  const page = mount(`<div class="packs-head"><h1>整合包</h1><p>安装会新建一个实例，整合包需要的东西全部自动装好。拖入 .mrpack 也可以。</p>
+    <div class="field large" style="max-width:520px;margin-bottom:14px">${icon('search')}<input placeholder="搜索 Modrinth 整合包…"></div>
+    <div class="chips"><button class="chip on">全部</button><button class="chip">优化</button><button class="chip">冒险</button><button class="chip">科技</button><button class="chip">魔法</button><button class="chip">空岛</button><button class="chip">原版+</button><span style="flex:1"></span><button class="chip">${icon('sliders', 13)}版本与加载器</button></div></div>
+    <div class="packgrid">${DATA.packs.map((p, i) => `<div class="pack"><div class="cover" style="background-image:${cover(p.name, p.biome, 40, 14)}"><div class="tags">${p.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div></div><div class="body"><b>${p.name}</b><small>${p.by} · ${p.dl} 次下载</small><p>${p.desc}</p><div class="row"><span class="tag">${p.loader}</span><span class="tag">${p.version}</span><button class="btn primary" data-install="${i}">安装</button></div></div></div>`).join('')}</div>`);
+  $$('[data-install]', page).forEach(b => b.onclick = () => importPack(DATA.packs[b.dataset.install]));
+  $$('.chip', page).forEach(c => c.onclick = () => { $$('.chip', page).forEach(x => x.classList.remove('on')); c.classList.add('on'); });
+}
+
+/* ---------- 设置页 ---------- */
+function renderSettings() {
+  renderToolbar(false);
+  const sec = SETTINGS_SECTIONS.find(s => s.id === state.settingsSection) || SETTINGS_SECTIONS[0];
+  const page = mount(`<div class="settings"><nav><h2>设置</h2>${SETTINGS_SECTIONS.map(s => `<button class="${s.id === sec.id ? 'on' : ''}" data-sec="${s.id}">${icon(s.icon)}${s.name}</button>`).join('')}</nav>
+    <div class="content"><h2>${sec.name}</h2>${settingsSection(sec.id)}</div></div>`);
+  $$('[data-sec]', page).forEach(b => b.onclick = () => go('/settings/' + b.dataset.sec));
+  bindSettings(page, (theme) => { applyTheme('#2F8A5A'); if (theme) renderSettings(); renderSidebar(); });
+}
+
+/* ---------- 欢迎与空状态 ---------- */
+function renderWelcome() {
+  renderToolbar(false);
+  const page = mount(`<div class="welcome">
+    <div class="collage">${['forest', 'cave', 'sky', 'nether'].map((b, i) => `<i style="background-image:${cover('w' + i, b, 24, 15)};--r:${(i - 1.5) * 4}deg;animation-delay:${i * 60}ms"></i>`).join('')}</div>
+    <div><h1>欢迎使用 Yumu</h1><p style="margin-top:8px">一个简洁、轻量的 Minecraft 启动器。三步就能开始，剩下的交给它。</p></div>
+    <div class="steps">
+      <div class="step done"><div class="n">${icon('check', 14)}</div><b>登录账号</b><small>已用微软账号 Steve 登录。</small></div>
+      <div class="step"><div class="n">2</div><b>导入或新建</b><small>拖入整合包，或者从本机发现 3 个已有的存档。</small><button class="btn" id="wDiscover" style="align-self:flex-start;margin-top:4px">${icon('laptop')}导入本机存档</button></div>
+      <div class="step"><div class="n">3</div><b>开始游戏</b><small>Java、游戏文件自动准备好，点一下就行。</small></div>
+    </div>
+    <div style="display:flex;gap:10px"><button class="btn primary xl" id="wNew">${icon('plus', 18)}新建实例</button><button class="btn xl" id="wPacks">${icon('package', 18)}浏览整合包</button><button class="btn xl quiet" id="wSkip">以后再说</button></div>
+  </div>`);
+  $('#wNew', page).onclick = () => { state.welcomeDone = true; openNew(); }; $('#wPacks', page).onclick = () => { state.welcomeDone = true; go('/packs'); }; $('#wSkip', page).onclick = () => { state.welcomeDone = true; go('/'); };
+  $('#wDiscover', page).onclick = () => openSheet(overlays, `<h4>本机已有的 Minecraft</h4><p class="sub">在官方启动器里找到这些，勾选要导入的。</p><div class="modlist">${[['官方启动器 · 1.21.4', '2 个存档 · 1.1 GB'], ['官方启动器 · 1.20.1 (Forge)', '1 个存档 · 24 个模组'], ['HMCL · 生存', '1 个存档']].map(([a, b]) => `<div class="mrow"><div class="mi">${icon('laptop', 14)}</div><div class="texts"><b>${a}</b><small>${b}</small></div><button class="switch" aria-checked="true"></button></div>`).join('')}</div><div class="buttons"><button class="btn" data-close>取消</button><button class="btn primary" data-close>导入 3 个</button></div>`);
+}
+function renderEmpty() {
+  renderToolbar(false);
+  const page = mount(`<div class="empty"><div class="art">${icon('cube', 44)}</div><h2>还没有实例</h2><p>新建一个实例，或者导入整合包，剩下的交给 Yumu。</p>
+    <div style="display:flex;gap:10px;margin-top:6px"><button class="btn primary large" id="eNew">新建实例</button><button class="btn large" id="ePacks">浏览整合包</button><button class="btn large" id="eDrop">导入整合包</button></div><span class="hint">拖入 .mrpack 即可导入</span></div>`);
+  $('#eNew', page).onclick = () => openNew(); $('#ePacks', page).onclick = () => go('/packs'); $('#eDrop', page).onclick = simulateDrop;
+}
+
+/* ---------- 行为 ---------- */
+function play(id) {
+  const ins = instances.find(i => i.id === id); state.crash = state.crash === id ? null : state.crash;
+  state.activity[id] = 'preparing'; refresh();
+  setTimeout(() => {
+    state.activity[id] = 'installing'; refresh();
+    let done = 0; const total = 412;
+    const t = setInterval(() => {
+      done = Math.min(total, done + 20 + Math.random() * 40);
+      const n = $('#instNum'); if (n && state.selected === id) n.textContent = `正在安装… ${Math.round(done)} / ${total} MB`;
+      if (done >= total) { clearInterval(t); setTimeout(() => { delete state.activity[id]; state.running[id] = Date.now(); ins.lastPlayed = '刚刚'; refresh(); toast(overlays, `${ins.name} 已启动`); }, 300); }
+    }, 160);
+  }, 700);
+}
+function stop(id) { delete state.running[id]; refresh(); toast(overlays, `${instances.find(i => i.id === id).name} 已结束`); }
+function refresh() { renderSidebar(); const p = scroll.querySelector('.pane:not(.out)'); if (p && location.hash.startsWith('#/instance')) { renderHeroStatus(p); renderToolbar(true); } else renderToolbar(false); }
+
+function moreItems(ins) { return [
+  { icon: 'folder', label: '打开文件夹' }, { icon: 'package', label: '导出为 .mrpack…' }, '-',
+  { icon: 'copy', label: '复制实例', run: () => duplicate(ins) }, { icon: 'pen', label: '重命名…', run: () => rename(ins) }, { icon: 'gear', label: '实例设置', run: () => { go('/instance/' + ins.id + '/settings'); } }, '-',
+  { icon: 'trash', label: '删除实例', danger: true, run: () => confirmDelete(ins) } ]; }
+function contextMenu(e, ins) { menu(main, e.clientX, e.clientY, [state.running[ins.id] ? { icon: 'stop', label: '结束游戏', run: () => stop(ins.id) } : { icon: 'play', label: '开始游戏', run: () => play(ins.id) }, { icon: ins.favorite ? 'star' : 'starFill', label: ins.favorite ? '取消收藏' : '收藏', run: () => { ins.favorite = !ins.favorite; refresh(); } }, '-', ...moreItems(ins)]); }
+
+function openNew(preset) {
+  const { sheet, close } = openSheet(overlays, `<h4>新建实例</h4><p class="sub">不改任何项直接创建也没问题。</p>${newInstanceForm()}<div class="buttons"><button class="btn" data-close>取消</button><button class="btn primary" id="nCreate">创建</button></div>`);
+  bindDisclosures(sheet); bindIconPick(sheet);
+  if (preset) $$('#nLoader button', sheet).find(b => b.textContent === preset).click();
+  setTimeout(() => $('#nName', sheet).focus(), 60);
+  $('#nCreate', sheet).onclick = () => {
+    const loader = $('#nLoader [aria-selected="true"]', sheet).textContent; const ver = $('#nVer', sheet).value.replace(/（.*）|显示全部版本…/g, '') || '26.3';
+    const name = $('#nName', sheet).value.trim() || ver; const biome = $('.iconpick button.on', sheet).title || 'forest';
+    const id = 'n' + Date.now();
+    instances.push({ id, name, loader: loader === '原版' ? null : loader, loaderVersion: loader === '原版' ? '' : '最新', version: ver, biome, lastPlayed: '从未', playtime: '0 分钟', hours: 0, favorite: false, mods: [], shaders: [], packs: [], worlds: [] });
+    close(); state.tab = 'overview'; go('/instance/' + id); renderSidebar({ enter: id });
+  };
+}
+function duplicate(ins) { const id = 'd' + Date.now(); instances.push({ ...ins, id, name: ins.name + ' 副本', favorite: false, lastPlayed: '从未', playtime: '0 分钟', hours: 0 }); go('/instance/' + id); renderSidebar({ enter: id }); toast(overlays, '实例已复制'); }
+function rename(ins) { const { sheet, close } = openSheet(overlays, `<h4>重命名</h4><div class="field large"><input id="rn" value="${ins.name}"></div><div class="buttons"><button class="btn" data-close>取消</button><button class="btn primary" id="rnOk">重命名</button></div>`, 'confirm'); setTimeout(() => $('#rn', sheet).select(), 60); $('#rnOk', sheet).onclick = () => { ins.name = $('#rn', sheet).value.trim() || ins.name; close(); renderInstance(); renderSidebar(); }; }
+function confirmDelete(ins) {
+  const { close } = openSheet(overlays, `<h4>删除“${ins.name}”？</h4><p>它的 ${ins.worlds.length} 个存档和设置也会一起删除，不能撤销。</p><div class="buttons"><button class="btn" data-close>取消</button><button class="btn danger" id="doDel">删除实例</button></div>`, 'confirm');
+  $('#doDel', overlays).onclick = () => {
+    close(); const row = $(`.sb-row[data-id="${ins.id}"]`); row && row.classList.add('leave');
+    setTimeout(() => { const i = instances.indexOf(ins); instances.splice(i, 1); delete state.running[ins.id]; if (state.selected === ins.id) state.selected = instances[0]?.id; go(instances.length ? '/instance/' + state.selected : '/'); renderSidebar(); toast(overlays, '实例已删除', '撤销'); }, 280);
+  };
+}
+function simulateDrop() {
+  const d = el(`<div class="drop"><div class="box">${icon('import', 48)}拖入 .mrpack 即可导入</div></div>`); overlays.appendChild(d);
+  setTimeout(() => { d.classList.add('out'); setTimeout(() => d.remove(), 200); importPack(DATA.packs[0]); }, 1000);
+}
+function importPack(pack) {
+  if (state.importing) return; state.importing = pack.name;
+  $('#importSlot').innerHTML = `<div class="import-status enter"><span id="impText">正在安装「${pack.name}」… 0%</span><div class="progress"><i id="impBar"></i></div></div>`;
+  let p = 0; const t = setInterval(() => {
+    p = Math.min(100, p + 3 + Math.random() * 8); const bar = $('#impBar'), txt = $('#impText');
+    if (bar) { bar.style.width = p + '%'; txt.textContent = `正在安装「${pack.name}」… ${Math.round(p)}%`; }
+    if (p >= 100) { clearInterval(t); setTimeout(() => {
+      const s = $('#importSlot').firstElementChild; if (s) { s.classList.add('leave'); setTimeout(() => s.remove(), 300); }
+      const id = 'p' + Date.now();
+      instances.push({ id, name: pack.name, loader: pack.loader, loaderVersion: '最新', version: pack.version, biome: pack.biome, lastPlayed: '从未', playtime: '0 分钟', hours: 0, favorite: false, mods: [...MODS.perf, ...MODS.qol.slice(0, 2)], shaders: [], packs: [], worlds: [] });
+      state.importing = null; state.tab = 'overview'; go('/instance/' + id); renderSidebar({ enter: id }); toast(overlays, '整合包已安装');
+    }, 300); }
+  }, 150);
+}
+$('#accountBar').onclick = () => {
+  if ($('.popover', overlays)) { $('.popover', overlays).remove(); return; }
+  const p = el(`<div class="popover">${DATA.accounts.map(a => `<div class="prow" data-acc="${a.id}"><div class="avatar">${face(a.id, 32)}</div><div class="texts"><div>${a.name}</div><small>${a.kind}</small></div>${a.active ? icon('check') : ''}</div>`).join('')}<hr><div class="prow" style="color:var(--accent)">${icon('plus')}<div class="texts">添加账号…</div></div><div class="prow" data-go-acc>${icon('users')}<div class="texts">管理账号</div></div></div>`);
+  $$('[data-acc]', p).forEach(r => r.onclick = () => { DATA.accounts.forEach(a => a.active = a.id === r.dataset.acc); p.remove(); renderSidebar(); });
+  $('[data-go-acc]', p).onclick = () => { p.remove(); go('/settings/accounts'); };
+  $('#app').appendChild(p);
+  setTimeout(() => document.addEventListener('pointerdown', function h(e) { if (!p.contains(e.target) && !$('#accountBar').contains(e.target)) { p.remove(); document.removeEventListener('pointerdown', h); } }), 0);
+};
+$('#sbNew').onclick = () => openNew(); $('#sbPacks').onclick = () => go('/packs'); $('#sbSettings').onclick = () => go('/settings');
+document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key === 'n') { e.preventDefault(); openNew(); } if ((e.metaKey || e.ctrlKey) && e.key === ',') { e.preventDefault(); go('/settings'); } });
+
+/* ---------- 启动 ---------- */
+applyTheme('#2F8A5A');
+hydrateIcons();
+designBar({ name: '方案一 · 森林', scenes: [{ id: 'welcome', label: '欢迎页' }, { id: 'crash', label: '模拟崩溃' }, { id: 'multi', label: '同时运行两个' }, { id: 'drop', label: '拖入整合包' }, { id: 'empty', label: '空状态' }, { id: 'reset', label: '重置' }],
+  rerender: () => { applyTheme('#2F8A5A'); renderSidebar(); }, scene: id => {
+    if (id === 'welcome') { state.welcomeDone = false; go('/welcome'); }
+    if (id === 'crash') { if (location.hash.startsWith('#/instance')) { delete state.running[state.selected]; state.crash = state.selected; renderInstance(); renderSidebar(); } }
+    if (id === 'multi') { ['survival', 'create'].forEach(id => { if (!state.running[id] && !state.activity[id]) play(id); }); }
+    if (id === 'drop') simulateDrop();
+    if (id === 'empty') { instances.splice(0, instances.length); state.running = {}; go('/'); renderSidebar(); }
+    if (id === 'reset') location.reload();
+  } });
+router(parts => {
+  $$('.runpop, .popover', overlays).forEach(x => x.remove());
+  const [p, a, b] = parts;
+  if (!state.welcomeDone && p !== 'welcome') { go('/welcome'); return; }
+  if (p === 'instance' && instances.find(i => i.id === a)) { state.selected = a; if (b) state.tab = b; renderInstance(); }
+  else if (p === 'packs') renderPacks();
+  else if (p === 'settings') { state.settingsSection = a || 'general'; renderSettings(); }
+  else if (p === 'welcome') renderWelcome();
+  else if (!instances.length) renderEmpty();
+  else { go('/instance/' + (instances.find(i => i.id === state.selected) ? state.selected : instances[0].id)); return; }
+  renderSidebar();
+});
+renderSidebar({ initial: true });
+</script>
+</body>
+</html>

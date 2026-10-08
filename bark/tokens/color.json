@@ -1,0 +1,76 @@
+{
+  "background": {
+    "canvas": {
+      "light": "#FAFAF8",
+      "dark": "#1C1C1E"
+    },
+    "sidebar": {
+      "light": "#F2F2EF",
+      "dark": "#161618"
+    }
+  },
+  "surface": {
+    "default": {
+      "light": "#FFFFFF",
+      "dark": "#262628"
+    },
+    "elevated": {
+      "light": "#FFFFFF",
+      "dark": "#2E2E31"
+    },
+    "sunken": {
+      "light": "#F0F0ED",
+      "dark": "#17171A"
+    },
+    "hover": {
+      "light": "rgba(0,0,0,0.04)",
+      "dark": "rgba(255,255,255,0.06)"
+    },
+    "pressed": {
+      "light": "rgba(0,0,0,0.08)",
+      "dark": "rgba(255,255,255,0.1)"
+    }
+  },
+  "border": {
+    "subtle": {
+      "light": "rgba(0,0,0,0.08)",
+      "dark": "rgba(255,255,255,0.09)"
+    },
+    "strong": {
+      "light": "rgba(0,0,0,0.18)",
+      "dark": "rgba(255,255,255,0.2)"
+    }
+  },
+  "text": {
+    "primary": {
+      "light": "#141414",
+      "dark": "#F2F2F0"
+    },
+    "secondary": {
+      "light": "#6B6B68",
+      "dark": "#A8A8A5"
+    },
+    "tertiary": {
+      "light": "#9C9C98",
+      "dark": "#737370"
+    },
+    "onAccent": {
+      "light": "#FFFFFF",
+      "dark": "#FFFFFF"
+    }
+  },
+  "status": {
+    "success": {
+      "light": "#2F8A5A",
+      "dark": "#4FB57D"
+    },
+    "warning": {
+      "light": "#C6882A",
+      "dark": "#E0A94A"
+    },
+    "danger": {
+      "light": "#C9453B",
+      "dark": "#E26B61"
+    }
+  }
+}

@@ -1,0 +1,1115 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bark 界面规范 · Yumu</title>
+<meta name="description" content="Yumu 多端界面规范的可交互演示：同一套令牌、同一套动效，在 macOS、Windows、Linux 上长一个样子。">
+<style>
+/* ---------- 令牌（与 bark/tokens/*.json 一致，由页面底部脚本注入到 :root） ---------- */
+:root {
+  --space-xs: 4px; --space-sm: 8px; --space-md: 12px; --space-lg: 16px;
+  --space-xl: 24px; --space-xxl: 32px; --space-xxxl: 48px;
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 14px; --radius-xl: 20px;
+  --type-display: 28px; --type-title: 20px; --type-headline: 15px;
+  --type-body: 13px; --type-callout: 12px; --type-caption: 11px;
+  --motion-quick: 150ms cubic-bezier(0, 0, 0.2, 1);
+  --motion-standard: 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-emphasized: 450ms cubic-bezier(0.34, 1.3, 0.64, 1);
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Noto Sans CJK SC", sans-serif;
+  color-scheme: light dark;
+}
+[data-motion="reduced"] {
+  --motion-quick: 0ms linear; --motion-standard: 0ms linear; --motion-emphasized: 0ms linear;
+}
+
+/* ---------- 文档页面本身 ---------- */
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font: var(--type-body)/1.5 var(--font);
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  transition: background var(--motion-standard), color var(--motion-standard);
+}
+a { color: var(--accent); text-decoration: none; }
+code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; background: var(--surface-sunken); padding: 1px 5px; border-radius: var(--radius-sm); }
+
+.doc-nav {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-lg);
+  background: color-mix(in srgb, var(--bg-canvas) 82%, transparent);
+  backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.doc-nav .brand { display: flex; align-items: center; gap: var(--space-sm); font-weight: 600; font-size: var(--type-headline); margin-right: var(--space-md); }
+.doc-nav .brand .logo { width: 22px; height: 22px; border-radius: 7px; background: var(--accent); display: grid; place-items: center; color: #fff; }
+.doc-nav .links { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+.doc-nav .links::-webkit-scrollbar { display: none; }
+.doc-nav .links a { color: var(--text-secondary); padding: 5px 10px; border-radius: var(--radius-md); white-space: nowrap; transition: background var(--motion-quick), color var(--motion-quick); }
+.doc-nav .links a:hover { background: var(--surface-hover); color: var(--text-primary); }
+.doc-nav .links a.active { color: var(--text-primary); background: var(--surface-pressed); }
+.doc-nav .spacer { flex: 1; }
+.doc-nav .controls { display: flex; gap: var(--space-xs); align-items: center; }
+
+.container { max-width: 1120px; margin: 0 auto; padding: 0 var(--space-lg); }
+section.doc { padding: var(--space-xxxl) 0; scroll-margin-top: 64px; }
+section.doc + section.doc { border-top: 1px solid var(--border-subtle); }
+.eyebrow { font-size: var(--type-caption); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 600; margin-bottom: var(--space-sm); }
+h1 { font-size: 40px; line-height: 1.15; font-weight: 600; margin: 0 0 var(--space-md); letter-spacing: -0.01em; }
+h2 { font-size: var(--type-display); line-height: 1.2; font-weight: 600; margin: 0 0 var(--space-sm); letter-spacing: -0.01em; }
+h3 { font-size: var(--type-headline); font-weight: 600; margin: var(--space-xl) 0 var(--space-sm); }
+p.lead { font-size: 17px; color: var(--text-secondary); max-width: 640px; margin: 0 0 var(--space-xl); }
+p.note { color: var(--text-secondary); font-size: var(--type-callout); max-width: 720px; margin: var(--space-sm) 0 0; }
+
+.hero { padding-top: var(--space-xxxl); }
+.principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-md); margin-top: var(--space-xl); }
+.principle { background: var(--surface-default); border-radius: var(--radius-lg); padding: var(--space-lg); transition: box-shadow var(--motion-quick), transform var(--motion-quick); }
+.principle:hover { box-shadow: var(--elev-raised); transform: translateY(-1px); }
+.principle .n { width: 28px; height: 28px; border-radius: 9px; background: var(--accent-tint); color: var(--accent); display: grid; place-items: center; font-weight: 600; margin-bottom: var(--space-md); }
+.principle b { display: block; font-size: var(--type-headline); margin-bottom: var(--space-xs); }
+.principle span { color: var(--text-secondary); }
+
+.toolbar-row { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; margin: var(--space-lg) 0; }
+.toolbar-row .label { color: var(--text-secondary); font-size: var(--type-callout); margin-right: var(--space-xs); }
+
+/* ---------- 通用控件（这些就是规范里的组件，页面与模拟器共用） ---------- */
+.btn {
+  appearance: none; border: 0; cursor: pointer; font: inherit; font-weight: 500;
+  height: 28px; padding: 0 12px; border-radius: var(--radius-md);
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  background: var(--surface-elevated); color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  transition: background var(--motion-quick), transform var(--motion-quick), box-shadow var(--motion-quick), opacity var(--motion-quick);
+  position: relative;
+}
+.btn::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--surface-hover); opacity: 0; transition: opacity var(--motion-quick); pointer-events: none; }
+.btn:hover::after { opacity: 1; }
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: .4; pointer-events: none; }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn.primary { background: var(--accent); color: var(--text-on-accent); box-shadow: none; }
+.btn.primary:hover { background: var(--accent-hover); }
+.btn.primary::after { background: rgba(255,255,255,.1); }
+.btn.text { background: transparent; box-shadow: none; color: var(--accent); }
+.btn.danger { background: var(--danger-tint); color: var(--danger); box-shadow: none; }
+.btn.large { height: 36px; padding: 0 18px; font-size: 14px; border-radius: var(--radius-md); min-width: 120px; justify-content: center; }
+.btn.icon { width: 28px; padding: 0; justify-content: center; background: transparent; box-shadow: none; color: var(--text-secondary); }
+.btn.icon:hover { color: var(--text-primary); }
+.btn.toggle[aria-pressed="true"] { background: var(--accent-tint); color: var(--accent); box-shadow: none; }
+.btn svg { width: 16px; height: 16px; flex: none; }
+
+.segmented { display: inline-flex; position: relative; background: var(--surface-sunken); border-radius: var(--radius-md); padding: 2px; height: 28px; isolation: isolate; }
+.segmented button { appearance: none; border: 0; background: transparent; font: inherit; font-weight: 500; color: var(--text-secondary); padding: 0 14px; border-radius: 8px; cursor: pointer; position: relative; z-index: 1; transition: color var(--motion-quick); white-space: nowrap; }
+.segmented button[aria-selected="true"] { color: var(--text-primary); }
+.segmented button:disabled { opacity: .4; cursor: default; }
+.segmented .thumb { position: absolute; top: 2px; bottom: 2px; left: 2px; width: 0; background: var(--surface-elevated); border-radius: 8px; box-shadow: var(--elev-raised); transition: transform var(--motion-standard), width var(--motion-standard); }
+.segmented button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.field { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 10px; border-radius: var(--radius-sm); background: var(--surface-sunken); transition: background var(--motion-quick), box-shadow var(--motion-quick); color: var(--text-primary); }
+.field:focus-within { background: var(--surface-default); box-shadow: 0 0 0 2px var(--accent); }
+.field input, .field select { appearance: none; border: 0; background: transparent; font: inherit; color: inherit; flex: 1; min-width: 0; outline: none; padding: 0; }
+.field input::placeholder { color: var(--text-tertiary); }
+.field svg { width: 14px; height: 14px; color: var(--text-tertiary); flex: none; }
+.field select { cursor: pointer; }
+.field.select { position: relative; }
+.field.select::after { content: ""; width: 7px; height: 7px; border-right: 1.5px solid var(--text-secondary); border-bottom: 1.5px solid var(--text-secondary); transform: rotate(45deg) translateY(-2px); flex: none; }
+
+.switch { width: 44px; height: 24px; border-radius: 12px; background: var(--border-strong); position: relative; cursor: pointer; border: 0; padding: 0; transition: background var(--motion-quick); flex: none; }
+.switch::before { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform var(--motion-standard); }
+.switch[aria-checked="true"] { background: var(--accent); }
+.switch[aria-checked="true"]::before { transform: translateX(20px); }
+.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.progress { height: 4px; border-radius: 2px; background: var(--surface-sunken); overflow: hidden; }
+.progress > i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 2px; transition: width var(--motion-standard); }
+.spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--border-strong); border-top-color: var(--accent); animation: spin .8s linear infinite; flex: none; }
+.spinner.lg { width: 20px; height: 20px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+[data-motion="reduced"] .spinner { animation-duration: 1.6s; }
+
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+.dot.success { background: var(--success); } .dot.accent { background: var(--accent); } .dot.warning { background: var(--warning); } .dot.danger { background: var(--danger); }
+.dot.breathe { animation: breathe 2s ease-in-out infinite; }
+@keyframes breathe { 0%,100% { opacity: 1 } 50% { opacity: .6 } }
+[data-motion="reduced"] .dot.breathe { animation: none; }
+
+.tag { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: var(--radius-sm); background: var(--surface-sunken); color: var(--text-secondary); font-size: var(--type-caption); font-weight: 500; }
+.tag.accent { background: var(--accent-tint); color: var(--accent); }
+
+.row { display: flex; align-items: center; gap: var(--space-md); height: 36px; padding: 0 var(--space-md); border-radius: var(--radius-sm); cursor: default; position: relative; transition: background var(--motion-quick); user-select: none; }
+.row:hover { background: var(--surface-hover); }
+.row svg { width: 16px; height: 16px; color: var(--accent); flex: none; }
+.row .texts { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; line-height: 1.25; }
+.row .texts small { color: var(--text-secondary); font-size: var(--type-caption); }
+.row .texts span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.card { background: var(--surface-default); border-radius: var(--radius-lg); padding: var(--space-lg); transition: box-shadow var(--motion-quick), transform var(--motion-quick); }
+.card:hover { box-shadow: var(--elev-raised); }
+
+.menu { position: absolute; z-index: 30; min-width: 180px; background: var(--surface-elevated); border-radius: var(--radius-md); box-shadow: var(--elev-overlay), inset 0 0 0 1px var(--border-subtle); padding: 4px; transform-origin: top left; animation: menuIn var(--motion-standard) both; }
+@keyframes menuIn { from { opacity: 0; transform: scale(.96) } to { opacity: 1; transform: none } }
+.menu button { appearance: none; border: 0; background: transparent; font: inherit; color: var(--text-primary); display: flex; width: 100%; align-items: center; gap: 8px; height: 26px; padding: 0 10px; border-radius: 6px; cursor: pointer; text-align: left; }
+.menu button:hover { background: var(--accent); color: #fff; }
+.menu button.danger { color: var(--danger); }
+.menu button.danger:hover { background: var(--danger); color: #fff; }
+.menu hr { border: 0; border-top: 1px solid var(--border-subtle); margin: 4px 8px; }
+
+/* ---------- 应用模拟器 ---------- */
+.stage { position: relative; margin-top: var(--space-lg); }
+.stage-fit { width: 1060px; transform-origin: top left; }
+.window {
+  width: 1060px; height: 660px; border-radius: 12px; overflow: hidden; position: relative;
+  background: var(--bg-canvas); color: var(--text-primary);
+  box-shadow: var(--elev-overlay), inset 0 0 0 1px var(--border-subtle);
+  display: grid; grid-template-rows: auto 1fr; font-size: var(--type-body);
+  transition: background var(--motion-standard), color var(--motion-standard);
+}
+.window[data-frame="win"] { border-radius: 8px; font-family: "Segoe UI Variable Text", "Segoe UI", var(--font); }
+.window[data-frame="linux"] { border-radius: 12px; font-family: Cantarell, Inter, var(--font); }
+.titlebar { height: 52px; display: grid; grid-template-columns: 240px 1fr; position: relative; z-index: 2; }
+.titlebar .left { display: flex; align-items: center; padding: 0 var(--space-lg); background: var(--bg-sidebar); gap: 8px; }
+.titlebar .right { display: flex; align-items: center; padding: 0 var(--space-lg); gap: var(--space-xs); }
+.titlebar .title { font-weight: 600; flex: 1; text-align: center; color: var(--text-secondary); font-size: var(--type-callout); }
+.lights { display: flex; gap: 8px; }
+.lights i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.15); }
+.lights i:nth-child(2) { background: #febc2e; } .lights i:nth-child(3) { background: #28c840; }
+.wincontrols { display: flex; gap: 2px; margin-left: auto; }
+.wincontrols i { width: 40px; height: 32px; display: grid; place-items: center; color: var(--text-secondary); border-radius: 4px; }
+.wincontrols i:last-child:hover { background: #c42b1c; color: #fff; }
+.gnomecontrols { margin-left: auto; display: flex; gap: 8px; }
+.gnomecontrols i { width: 22px; height: 22px; border-radius: 50%; background: var(--surface-sunken); display: grid; place-items: center; color: var(--text-primary); }
+.window[data-frame="mac"] .wincontrols, .window[data-frame="mac"] .gnomecontrols { display: none; }
+.window[data-frame="win"] .lights, .window[data-frame="win"] .gnomecontrols { display: none; }
+.window[data-frame="win"] .titlebar .title { text-align: left; }
+.window[data-frame="linux"] .lights, .window[data-frame="linux"] .wincontrols { display: none; }
+
+.body { display: grid; grid-template-columns: 240px 1fr; min-height: 0; }
+.sidebar { background: var(--bg-sidebar); display: flex; flex-direction: column; min-height: 0; transition: background var(--motion-standard); }
+.sidebar .list { flex: 1; overflow: auto; padding: var(--space-sm); display: flex; flex-direction: column; gap: var(--space-xs); position: relative; }
+.sidebar .list .selection { position: absolute; left: var(--space-sm); right: var(--space-sm); height: 36px; border-radius: var(--radius-sm); background: var(--accent-tint); transition: transform var(--motion-standard), opacity var(--motion-quick); pointer-events: none; opacity: 0; }
+.sidebar .row { background: transparent; }
+.sidebar .row.enter { animation: rowIn var(--motion-standard) both; }
+.sidebar .row.pop { animation: pop var(--motion-emphasized); }
+.sidebar .row.leave { animation: rowOut var(--motion-standard) both; pointer-events: none; }
+@keyframes rowIn { from { opacity: 0; transform: scale(.96) } to { opacity: 1; transform: none } }
+@keyframes rowOut { to { opacity: 0; transform: scale(.96); height: 0; margin-top: -4px } }
+@keyframes pop { 0% { transform: scale(1) } 40% { transform: scale(1.04) } 100% { transform: scale(1) } }
+.import-status { padding: var(--space-md); background: var(--surface-default); display: grid; gap: var(--space-xs); font-size: var(--type-caption); color: var(--text-secondary); animation: rowIn var(--motion-standard) both; }
+.import-status.leave { animation: rowOut var(--motion-standard) both; }
+.account-bar { border-top: 1px solid var(--border-subtle); padding: var(--space-sm) var(--space-md); display: flex; align-items: center; gap: var(--space-sm); cursor: pointer; position: relative; }
+.account-bar:hover { background: var(--surface-hover); }
+.avatar { width: 28px; height: 28px; border-radius: 7px; background: linear-gradient(135deg, #8b5e3c, #5b3a21); position: relative; overflow: hidden; flex: none; image-rendering: pixelated; }
+.avatar::before { content: ""; position: absolute; left: 25%; right: 25%; top: 42%; height: 18%; background: #e8b690; box-shadow: -3px 0 0 #e8b690, 3px 0 0 #e8b690; }
+.avatar::after { content: ""; position: absolute; left: 32%; top: 50%; width: 4px; height: 4px; background: #3c2a1a; box-shadow: 8px 0 0 #3c2a1a; }
+.account-bar .texts { flex: 1; min-width: 0; line-height: 1.2; }
+.account-bar small { color: var(--text-secondary); font-size: var(--type-caption); }
+
+.content .segmented { align-self: flex-start; }
+.content { position: relative; display: flex; flex-direction: column; min-height: 0; padding: var(--space-xxl); gap: var(--space-xl); }
+.detail-header { display: flex; align-items: center; gap: var(--space-lg); }
+.detail-header .art { width: 72px; height: 72px; border-radius: var(--radius-lg); background: var(--accent-tint); color: var(--accent); display: grid; place-items: center; flex: none; }
+.detail-header .art svg { width: 32px; height: 32px; }
+.detail-header .name { font-size: var(--type-display); font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; }
+.detail-header .sub { color: var(--text-secondary); margin-top: 2px; }
+.detail-header .actions { margin-left: auto; display: flex; gap: var(--space-xs); position: relative; }
+.detail-body { flex: 1; min-height: 0; position: relative; }
+.pane { position: absolute; inset: 0; display: flex; flex-direction: column; gap: var(--space-md); animation: paneIn var(--motion-standard) both; }
+.pane.out { animation: paneOut var(--motion-standard) both; pointer-events: none; }
+@keyframes paneIn { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+@keyframes paneOut { to { opacity: 0; transform: translateY(-8px) } }
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-sm) var(--space-xl); }
+.kv dt { color: var(--text-secondary); } .kv dd { margin: 0; }
+.footer { display: flex; align-items: flex-end; gap: var(--space-lg); }
+.footer .status { flex: 1; display: flex; align-items: center; gap: var(--space-sm); color: var(--text-secondary); min-height: 36px; }
+.footer .status .bar { display: grid; gap: var(--space-xs); width: 260px; }
+.footer .status .num { font-variant-numeric: tabular-nums; font-size: var(--type-callout); }
+.footer .status .success { color: var(--success); }
+.footer .status .danger-text { color: var(--danger); display: flex; align-items: center; gap: 8px; }
+.pop-once { animation: pop var(--motion-emphasized); }
+
+.empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: var(--space-lg); animation: paneIn var(--motion-standard) both; }
+.empty svg { width: 56px; height: 56px; color: var(--text-tertiary); }
+.empty h4 { margin: 0; font-size: var(--type-title); font-weight: 600; }
+.empty p { margin: 0; color: var(--text-secondary); max-width: 360px; }
+.empty .hint { color: var(--text-tertiary); font-size: var(--type-caption); }
+
+.modlist { display: flex; flex-direction: column; gap: var(--space-xs); overflow: auto; }
+.modlist .row { height: 36px; background: var(--surface-default); }
+.modlist .row .texts span { font-weight: 500; }
+.hint-box { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-md); color: var(--text-secondary); padding: var(--space-lg); background: var(--surface-default); border-radius: var(--radius-lg); }
+.skeleton { height: 36px; border-radius: var(--radius-sm); background: linear-gradient(90deg, var(--surface-sunken) 25%, var(--surface-hover) 50%, var(--surface-sunken) 75%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
+@keyframes shimmer { from { background-position: 200% 0 } to { background-position: -200% 0 } }
+
+/* Sheet 与遮罩 */
+.scrim { position: absolute; inset: 0; z-index: 20; background: rgba(0,0,0,.3); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: grid; place-items: start center; padding-top: 72px; animation: fade var(--motion-quick) both; }
+.scrim.out { animation: fadeOut var(--motion-quick) both; pointer-events: none; }
+@keyframes fade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes fadeOut { to { opacity: 0 } }
+.sheet { width: 440px; background: var(--surface-elevated); border-radius: var(--radius-xl); box-shadow: var(--elev-overlay); padding: var(--space-xl); display: flex; flex-direction: column; gap: var(--space-lg); animation: sheetIn var(--motion-emphasized) both; }
+.scrim.out .sheet { animation: sheetOut var(--motion-standard) both; }
+@keyframes sheetIn { from { opacity: 0; transform: translateY(-16px) scale(.96) } to { opacity: 1; transform: none } }
+@keyframes sheetOut { to { opacity: 0; transform: translateY(-8px) scale(.98) } }
+.sheet h4 { margin: 0; font-size: var(--type-title); font-weight: 600; }
+.sheet .form { display: grid; grid-template-columns: 96px 1fr; gap: var(--space-md) var(--space-lg); align-items: center; background: var(--surface-sunken); padding: var(--space-lg); border-radius: var(--radius-lg); }
+.sheet .form label { color: var(--text-secondary); text-align: right; }
+.sheet .form .field { background: var(--surface-default); }
+.sheet .form .field:focus-within { box-shadow: 0 0 0 2px var(--accent); }
+.disclosure { display: flex; flex-direction: column; }
+.disclosure > button { appearance: none; border: 0; background: transparent; font: inherit; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; padding: 0; cursor: pointer; height: 24px; }
+.disclosure > button svg { width: 12px; height: 12px; transition: transform var(--motion-standard); }
+.disclosure[data-open="true"] > button svg { transform: rotate(90deg); }
+.disclosure .body-wrap { display: grid; grid-template-rows: 0fr; transition: grid-template-rows var(--motion-standard); }
+.disclosure[data-open="true"] .body-wrap { grid-template-rows: 1fr; }
+.disclosure .body-wrap > div { overflow: hidden; }
+.disclosure .inner { display: grid; grid-template-columns: 96px 1fr; gap: var(--space-md) var(--space-lg); align-items: center; padding-top: var(--space-md); }
+.disclosure .inner label { color: var(--text-secondary); text-align: right; }
+.disclosure .inner small { grid-column: 2; color: var(--text-tertiary); font-size: var(--type-caption); margin-top: -6px; }
+.sheet .buttons { display: flex; justify-content: flex-end; gap: var(--space-sm); }
+.sheet.confirm { width: 360px; gap: var(--space-md); }
+.sheet.confirm p { margin: 0; color: var(--text-secondary); }
+.sheet.browser { width: 720px; height: 480px; }
+.packgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-md); overflow: auto; flex: 1; }
+.pack { display: flex; gap: var(--space-md); padding: var(--space-md); }
+.pack .picon { width: 48px; height: 48px; border-radius: var(--radius-md); flex: none; }
+.pack .ptexts { flex: 1; min-width: 0; }
+.pack .ptexts b { display: block; }
+.pack .ptexts small { color: var(--text-secondary); display: block; font-size: var(--type-caption); }
+.pack .ptexts p { margin: 4px 0 0; color: var(--text-secondary); font-size: var(--type-callout); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 拖放覆盖层 */
+.drop { position: absolute; inset: 0; z-index: 25; background: color-mix(in srgb, var(--bg-canvas) 70%, transparent); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); display: grid; place-items: center; animation: fade var(--motion-quick) both; }
+.drop.out { animation: fadeOut var(--motion-quick) both; }
+.drop .box { display: flex; flex-direction: column; align-items: center; gap: var(--space-md); color: var(--accent); padding: var(--space-xxl) var(--space-xxxl); border: 2px dashed var(--accent); border-radius: var(--radius-xl); font-size: var(--type-title); }
+.drop .box svg { width: 48px; height: 48px; }
+
+/* Toast */
+.toast { position: absolute; right: var(--space-lg); bottom: var(--space-lg); z-index: 40; display: flex; align-items: center; gap: var(--space-sm); background: var(--surface-elevated); box-shadow: var(--elev-overlay); border-radius: var(--radius-lg); padding: var(--space-md) var(--space-lg); animation: toastIn var(--motion-standard) both; }
+.toast.out { animation: toastOut var(--motion-quick) both; }
+.toast svg { width: 16px; height: 16px; color: var(--success); }
+@keyframes toastIn { from { opacity: 0; transform: translate(16px, 0) } to { opacity: 1; transform: none } }
+@keyframes toastOut { to { opacity: 0 } }
+
+/* popover (account) */
+.popover { position: absolute; left: var(--space-sm); bottom: 56px; z-index: 30; width: 224px; background: var(--surface-elevated); border-radius: var(--radius-md); box-shadow: var(--elev-overlay), inset 0 0 0 1px var(--border-subtle); padding: 4px; transform-origin: bottom left; animation: menuIn var(--motion-standard) both; }
+.popover .row { height: 40px; cursor: pointer; }
+.popover .row svg { color: var(--accent); width: 14px; height: 14px; }
+
+/* ---------- 令牌展示 ---------- */
+.grid { display: grid; gap: var(--space-md); }
+.grid.cols-4 { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+.grid.cols-3 { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.swatch { border-radius: var(--radius-lg); overflow: hidden; background: var(--surface-default); }
+.swatch .color { height: 64px; display: flex; align-items: flex-end; padding: var(--space-sm); gap: 4px; }
+.swatch .color i { flex: 1; height: 100%; border-radius: var(--radius-sm); box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
+.swatch .meta { padding: var(--space-sm) var(--space-md) var(--space-md); }
+.swatch .meta b { display: block; font-weight: 600; font-size: var(--type-callout); }
+.swatch .meta code { font-size: 10px; background: transparent; padding: 0; color: var(--text-tertiary); }
+.typerow { display: grid; grid-template-columns: 120px 1fr 120px; align-items: baseline; gap: var(--space-lg); padding: var(--space-md) 0; border-bottom: 1px solid var(--border-subtle); }
+.typerow:last-child { border: 0; }
+.typerow .k { color: var(--text-secondary); font-size: var(--type-callout); }
+.typerow .v { color: var(--text-tertiary); font-size: var(--type-caption); text-align: right; font-variant-numeric: tabular-nums; }
+.spacerow { display: flex; align-items: flex-end; gap: var(--space-lg); flex-wrap: wrap; }
+.spacerow .sp { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--text-secondary); font-size: var(--type-caption); }
+.spacerow .sp i { display: block; background: var(--accent); border-radius: 2px; opacity: .85; }
+.radiusrow { display: flex; gap: var(--space-lg); flex-wrap: wrap; }
+.radiusrow .r { width: 72px; height: 72px; background: var(--surface-default); box-shadow: inset 0 0 0 2px var(--accent); display: grid; place-items: center; color: var(--text-secondary); font-size: var(--type-caption); }
+.elevrow { display: flex; gap: var(--space-xl); flex-wrap: wrap; padding: var(--space-lg) 0; }
+.elevrow .e { width: 160px; height: 90px; border-radius: var(--radius-lg); background: var(--surface-elevated); display: grid; place-items: center; color: var(--text-secondary); font-size: var(--type-caption); }
+
+/* 组件画廊 */
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-md); }
+.gallery .card h5 { margin: 0 0 var(--space-md); font-size: var(--type-callout); color: var(--text-secondary); font-weight: 500; text-transform: uppercase; letter-spacing: .06em; }
+.gallery .stack { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; }
+.gallery .vstack { display: flex; flex-direction: column; gap: var(--space-sm); }
+
+/* 动效实验台 */
+.motion-lab { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-md); }
+.motion-lab .card { display: flex; flex-direction: column; gap: var(--space-md); }
+.motion-lab .track { height: 72px; border-radius: var(--radius-md); background: var(--surface-sunken); position: relative; overflow: hidden; }
+.motion-lab .ball { position: absolute; top: 20px; left: 16px; width: 32px; height: 32px; border-radius: 10px; background: var(--accent); }
+.motion-lab .ball.go-quick { transition: transform var(--motion-quick); }
+.motion-lab .ball.go-standard { transition: transform var(--motion-standard); }
+.motion-lab .ball.go-emphasized { transition: transform var(--motion-emphasized); }
+.motion-lab .ball.moved { transform: translateX(calc(100% * 7)); }
+.motion-lab .curve { height: 72px; width: 100%; }
+.motion-lab .curve path { fill: none; stroke: var(--accent); stroke-width: 2; }
+.motion-lab .curve line { stroke: var(--border-strong); stroke-width: 1; }
+.motion-lab .meta { display: flex; justify-content: space-between; color: var(--text-secondary); font-size: var(--type-callout); }
+.stagger-demo { display: flex; flex-direction: column; gap: var(--space-xs); }
+.stagger-demo .row { background: var(--surface-sunken); opacity: 0; }
+.stagger-demo.play .row { animation: rowIn var(--motion-standard) both; }
+
+/* 规则表 */
+table.rules { width: 100%; border-collapse: collapse; font-size: var(--type-body); }
+table.rules th, table.rules td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border-subtle); vertical-align: top; }
+table.rules th { color: var(--text-secondary); font-weight: 500; font-size: var(--type-callout); }
+table.rules td:first-child { white-space: nowrap; font-weight: 500; }
+.do-dont { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--space-md); }
+.do-dont .card ul { margin: 0; padding-left: 18px; color: var(--text-secondary); }
+.do-dont .card li { margin: 6px 0; }
+.do-dont .card b { color: var(--success); } .do-dont .card b.no { color: var(--danger); }
+
+footer.doc-foot { padding: var(--space-xxl) 0 var(--space-xxxl); color: var(--text-tertiary); font-size: var(--type-caption); border-top: 1px solid var(--border-subtle); }
+
+@media (max-width: 720px) {
+  h1 { font-size: 30px; }
+  .doc-nav .brand span { display: none; }
+  .typerow { grid-template-columns: 90px 1fr; }
+  .typerow .v { display: none; }
+}
+</style>
+</head>
+<body>
+
+<nav class="doc-nav">
+  <div class="brand"><span class="logo" data-icon="cube"></span><span>Bark 界面规范</span></div>
+  <div class="links">
+    <a href="#principles">原则</a>
+    <a href="#app">应用演示</a>
+    <a href="#tokens">令牌</a>
+    <a href="#components">组件</a>
+    <a href="#motion">动效</a>
+    <a href="#states">状态与披露</a>
+    <a href="#checklist">清单</a>
+  </div>
+  <div class="spacer"></div>
+  <div class="controls">
+    <button class="btn toggle" id="themeBtn" aria-pressed="false" title="切换深浅模式"><span data-icon="moon"></span><span class="t">深色</span></button>
+    <button class="btn toggle" id="motionBtn" aria-pressed="false" title="模拟系统的减弱动态效果"><span data-icon="motion"></span><span class="t">减弱动态</span></button>
+  </div>
+</nav>
+
+<main class="container">
+
+<section class="doc hero" id="principles">
+  <div class="eyebrow">Yumu · 原木</div>
+  <h1>换一台电脑打开 Yumu，<br>看到的是同一个产品。</h1>
+  <p class="lead">这页是 <code>bark/guidelines.md</code> 的可交互版本。页面上的每个按钮、每条动画都直接用 <code>bark/tokens/</code> 里的令牌驱动。右上角可以切深浅色，也可以模拟系统的「减弱动态效果」看看退化后的样子。</p>
+  <div class="principles">
+    <div class="principle"><div class="n">1</div><b>一眼看懂</b><span>每页只有一个强调色按钮。3 秒内知道自己在哪、能做什么。</span></div>
+    <div class="principle"><div class="n">2</div><b>一步到位</b><span>默认值已经填好。新建实例不改任何项就能创建，拖入整合包不问问题。</span></div>
+    <div class="principle"><div class="n">3</div><b>高级藏起来</b><span>高级功能全都在，但在「···」、折叠区或设置里，永不出现在主路径。</span></div>
+    <div class="principle"><div class="n">4</div><b>动起来才算完成</b><span>每个状态变化都有过渡，没有闪变。只动 transform 与 opacity。</span></div>
+  </div>
+</section>
+
+<section class="doc" id="app">
+  <div class="eyebrow">应用演示</div>
+  <h2>同一套界面，三种窗口边框</h2>
+  <p class="lead">切换下面的平台，只有窗口边框和字体在变，内容区一个像素都不动。窗口可以直接操作：点实例、开始游戏、新建、右键删除、拖入整合包、切换账号。</p>
+  <div class="toolbar-row">
+    <span class="label">平台</span>
+    <div class="segmented" id="frameSeg" role="tablist">
+      <div class="thumb"></div>
+      <button role="tab" aria-selected="true" data-frame="mac">macOS</button>
+      <button role="tab" aria-selected="false" data-frame="win">Windows</button>
+      <button role="tab" aria-selected="false" data-frame="linux">Linux</button>
+    </div>
+    <span class="label" style="margin-left:16px">场景</span>
+    <button class="btn" id="dropBtn"><span data-icon="import"></span>模拟拖入 .mrpack</button>
+    <button class="btn" id="crashBtn"><span data-icon="warning"></span>模拟崩溃</button>
+    <button class="btn" id="emptyBtn"><span data-icon="trash"></span>清空实例看空状态</button>
+    <button class="btn text" id="resetBtn">重置</button>
+  </div>
+
+  <div class="stage"><div class="stage-fit" id="stageFit">
+  <div class="window" id="win" data-frame="mac">
+    <div class="titlebar">
+      <div class="left">
+        <div class="lights"><i></i><i></i><i></i></div>
+        <div class="gnomecontrols" style="margin-left:0;display:none"></div>
+      </div>
+      <div class="right">
+        <span class="title" id="winTitle">Yumu</span>
+        <button class="btn icon" title="浏览整合包" id="tbBrowse"><span data-icon="package"></span></button>
+        <button class="btn icon" title="导入整合包" id="tbImport"><span data-icon="import"></span></button>
+        <button class="btn icon" title="新建实例" id="tbNew"><span data-icon="plus"></span></button>
+        <div class="wincontrols"><i>&#x2500;</i><i>&#x25A1;</i><i>&#x2715;</i></div>
+        <div class="gnomecontrols"><i>&#x2715;</i></div>
+      </div>
+    </div>
+    <div class="body">
+      <aside class="sidebar">
+        <div class="list" id="list"><div class="selection" id="selection"></div></div>
+        <div id="importSlot"></div>
+        <div class="account-bar" id="accountBar">
+          <div class="avatar"></div>
+          <div class="texts"><div id="accountName">Steve</div><small id="accountKind">微软</small></div>
+          <span data-icon="chevron" style="color:var(--text-tertiary)"></span>
+        </div>
+      </aside>
+      <div class="content" id="content"></div>
+    </div>
+    <div id="overlays"></div>
+  </div>
+  </div></div>
+  <p class="note">侧栏底部的导入进度不会阻塞任何操作；「开始游戏」是整窗唯一的强调色填充按钮；删除走右键菜单最底部的危险项并二次确认，确认按钮写「删除实例」而不是「确定」。</p>
+</section>
+
+<section class="doc" id="tokens">
+  <div class="eyebrow">令牌</div>
+  <h2>视觉令牌</h2>
+  <p class="lead">来自 <code>bark/tokens/</code>。语义命名，深浅成对。中性色带一点暖，这是「原木」的来源；强调色默认跟随系统，没有系统强调色时用苔绿。</p>
+  <h3>颜色 <code>color.json</code></h3>
+  <div class="grid cols-4" id="swatches"></div>
+  <h3>字体刻度 <code>type.json</code></h3>
+  <div class="card" id="typeScale"></div>
+  <p class="note">字体由平台决定：SF Pro、Segoe UI Variable、Cantarell。令牌只定义六级大小与字重，任何端不得硬编码字号。</p>
+  <h3>间距 <code>space.json</code></h3>
+  <div class="card"><div class="spacerow" id="spaceRow"></div></div>
+  <h3>圆角 <code>radius.json</code></h3>
+  <div class="card"><div class="radiusrow" id="radiusRow"></div></div>
+  <p class="note">按钮与输入 md，卡片与图标块 lg，Sheet 与覆盖层 xl，标签 sm。嵌套时内层圆角 = 外层圆角 − 内边距。</p>
+  <h3>层级 <code>elevation.json</code></h3>
+  <div class="card"><div class="elevrow">
+    <div class="e" style="box-shadow:none;background:var(--surface-default)">flat · 靠背景色区分</div>
+    <div class="e" style="box-shadow:var(--elev-raised)">raised · 卡片悬停</div>
+    <div class="e" style="box-shadow:var(--elev-overlay)">overlay · Sheet、菜单、Toast</div>
+  </div></div>
+</section>
+
+<section class="doc" id="components">
+  <div class="eyebrow">组件</div>
+  <h2>组件</h2>
+  <p class="lead">三端实现必须对上这张表。尺寸单位是逻辑像素。这里的每个控件和上面窗口里用的是同一份 CSS。</p>
+  <div class="gallery">
+    <div class="card"><h5>按钮 · 高 28 / 大 36</h5><div class="stack">
+      <button class="btn primary">开始游戏</button>
+      <button class="btn">打开文件夹</button>
+      <button class="btn text">显示全部版本</button>
+      <button class="btn danger">删除实例</button>
+      <button class="btn" disabled>已安装</button>
+      <button class="btn primary large"><span data-icon="play"></span>开始游戏</button>
+    </div><p class="note">主按钮每页一个。悬停叠层、按下缩放 0.97、禁用 40%、键盘聚焦 2px 外环。</p></div>
+    <div class="card"><h5>分段控件 · 高 28</h5><div class="vstack">
+      <div class="segmented" data-seg><div class="thumb"></div><button aria-selected="true">概览</button><button>模组</button><button>资源</button><button>日志</button></div>
+      <div class="segmented" data-seg><div class="thumb"></div><button aria-selected="true">原版</button><button>Fabric</button><button>Quilt</button><button>Forge</button><button disabled title="这个版本没有 NeoForge">NeoForge</button></div>
+    </div><p class="note">选中块位移用 standard。不可用的组合直接禁用并给 tooltip，不弹错误。</p></div>
+    <div class="card"><h5>输入与搜索 · 高 28</h5><div class="vstack">
+      <div class="field"><span data-icon="search"></span><input placeholder="搜索 Modrinth…"></div>
+      <div class="field"><input placeholder="名称" value="生存服 2026"></div>
+      <div class="field select"><select><option>26.3（最新）</option><option>26.2</option><option>1.21.1</option></select></div>
+    </div><p class="note">沉底背景、无边框。聚焦时底变白并画 2px 强调色外环。</p></div>
+    <div class="card"><h5>开关 · 44 × 24</h5><div class="vstack">
+      <div class="row" style="background:var(--surface-sunken)"><span data-icon="puzzle"></span><div class="texts"><span>Sodium</span><small>0.6.13 · 已启用</small></div><button class="switch" aria-checked="true" data-switch></button></div>
+      <div class="row" style="background:var(--surface-sunken)"><span data-icon="puzzle"></span><div class="texts"><span>Iris Shaders</span><small>1.8.1 · 已禁用</small></div><button class="switch" aria-checked="false" data-switch></button></div>
+    </div></div>
+    <div class="card"><h5>进度 · 永远带文字</h5><div class="vstack">
+      <div style="display:flex;justify-content:space-between;color:var(--text-secondary);font-size:var(--type-callout)"><span>正在安装…</span><span style="font-variant-numeric:tabular-nums" id="gProgNum">0 MB / 412 MB</span></div>
+      <div class="progress"><i id="gProg"></i></div>
+      <div style="display:flex;align-items:center;gap:8px;color:var(--text-secondary)"><span class="spinner"></span>正在获取版本列表…</div>
+      <div class="skeleton"></div>
+    </div><p class="note">线性进度条高 4。数字用等宽数字避免跳动。不确定时用进度环，超过 300 ms 才显示。</p></div>
+    <div class="card"><h5>状态点 · 标签</h5><div class="stack">
+      <span style="display:inline-flex;align-items:center;gap:6px"><span class="dot success breathe"></span>运行中</span>
+      <span style="display:inline-flex;align-items:center;gap:6px"><span class="dot accent"></span>安装中</span>
+      <span style="display:inline-flex;align-items:center;gap:6px"><span class="dot warning"></span>需要注意</span>
+      <span style="display:inline-flex;align-items:center;gap:6px"><span class="dot danger"></span>崩溃</span>
+    </div><div class="stack" style="margin-top:12px"><span class="tag">Fabric</span><span class="tag">26.3</span><span class="tag accent">已安装</span><span class="tag">1.2 万次下载</span></div>
+    <p class="note">运行中的点 2 秒呼吸一次，减弱动态时静止。不依赖颜色传递唯一信息，旁边总有文字。</p></div>
+    <div class="card"><h5>列表行 · 高 36</h5><div class="vstack" style="gap:4px">
+      <div class="row"><span data-icon="cube"></span><div class="texts"><span>原版 26.3</span><small>26.3</small></div></div>
+      <div class="row" style="background:var(--accent-tint)"><span data-icon="puzzle"></span><div class="texts"><span>生存服 2026</span><small>Fabric · 26.3</small></div><span class="dot success breathe"></span></div>
+      <div class="row"><span data-icon="puzzle"></span><div class="texts"><span>Create 工业</span><small>NeoForge · 1.21.1</small></div><span class="spinner"></span></div>
+    </div><p class="note">无分隔线，用 4px 间隔。选中用强调色淡底，不用描边。</p></div>
+    <div class="card"><h5>Toast · 右下角 3 秒</h5><div class="vstack">
+      <div style="position:relative;height:72px;background:var(--surface-sunken);border-radius:var(--radius-md)"><div class="toast" style="animation:none"><span data-icon="check"></span>整合包已导入<button class="btn text" style="height:24px;padding:0 6px">查看</button></div></div>
+    </div><p class="note">同时最多一条，后来的顶掉前面。一句陈述，不写「成功」，不用感叹号。</p></div>
+  </div>
+</section>
+
+<section class="doc" id="motion">
+  <div class="eyebrow">动效</div>
+  <h2>三个动效令牌</h2>
+  <p class="lead">来自 <code>motion.json</code>。点一下方块看曲线。所有位移、缩放在系统减弱动态效果时退化为 instant，只保留淡入淡出。右上角可以切换试试。</p>
+  <div class="motion-lab">
+    <div class="card" data-motion-demo="quick">
+      <div class="meta"><b>quick</b><span>150 ms · ease-out</span></div>
+      <div class="track"><div class="ball go-quick"></div></div>
+      <svg class="curve" viewBox="0 0 300 72" preserveAspectRatio="none"><line x1="0" y1="66" x2="300" y2="66"/><path d="M0 66 C 0 66, 60 6, 300 6"/></svg>
+      <div class="meta"><span>悬停、按下、开关、淡入淡出</span><button class="btn text" data-play>播放</button></div>
+    </div>
+    <div class="card" data-motion-demo="standard">
+      <div class="meta"><b>standard</b><span>≈ 300 ms · spring(0.35, 0.85)</span></div>
+      <div class="track"><div class="ball go-standard"></div></div>
+      <svg class="curve" viewBox="0 0 300 72" preserveAspectRatio="none"><line x1="0" y1="66" x2="300" y2="66"/><path d="M0 66 C 60 66, 60 6, 300 6"/></svg>
+      <div class="meta"><span>列表增删、面板切换、选中位移</span><button class="btn text" data-play>播放</button></div>
+    </div>
+    <div class="card" data-motion-demo="emphasized">
+      <div class="meta"><b>emphasized</b><span>≈ 450 ms · spring(0.5, 0.8)</span></div>
+      <div class="track"><div class="ball go-emphasized"></div></div>
+      <svg class="curve" viewBox="0 0 300 72" preserveAspectRatio="none"><line x1="0" y1="66" x2="300" y2="66"/><path d="M0 66 C 100 66, 120 -8, 190 2 S 260 6, 300 6"/></svg>
+      <div class="meta"><span>导入完成、创建成功、Sheet 进入</span><button class="btn text" data-play>播放</button></div>
+    </div>
+    <div class="card">
+      <div class="meta"><b>列表错峰</b><span>每项 20 ms · 最多 6 项</span></div>
+      <div class="stagger-demo" id="staggerDemo">
+        <div class="row"><span data-icon="cube"></span><div class="texts"><span>原版 26.3</span></div></div>
+        <div class="row"><span data-icon="puzzle"></span><div class="texts"><span>生存服 2026</span></div></div>
+        <div class="row"><span data-icon="puzzle"></span><div class="texts"><span>Create 工业</span></div></div>
+        <div class="row"><span data-icon="cube"></span><div class="texts"><span>红石实验</span></div></div>
+      </div>
+      <div class="meta"><span>时长不随数量变化</span><button class="btn text" id="staggerPlay">播放</button></div>
+    </div>
+  </div>
+  <h3>场景对照</h3>
+  <table class="rules">
+    <thead><tr><th>场景</th><th>令牌</th><th>怎么动</th></tr></thead>
+    <tbody>
+      <tr><td>选中列表行</td><td>standard</td><td>选中背景从旧行滑到新行，是同一个元素位移，不是两次淡入淡出</td></tr>
+      <tr><td>切换详情</td><td>standard</td><td>旧内容淡出上移 8，新内容淡入从下 8 归位；标题区、侧栏、底栏不动</td></tr>
+      <tr><td>列表新增 / 删除</td><td>standard</td><td>0.96 缩放 + 淡入淡出，其他行让位或合拢</td></tr>
+      <tr><td>Sheet 进入 / 退出</td><td>emphasized / standard</td><td>从上方 −16 下落带轻微过冲；退出反向不过冲</td></tr>
+      <tr><td>成功反馈</td><td>emphasized</td><td>目标元素 1 → 1.04 → 1 一次，配一条 Toast</td></tr>
+      <tr><td>错误反馈</td><td>quick</td><td>变色 + 文字出现。不抖动，不弹窗</td></tr>
+      <tr><td>运行中状态点</td><td>2 s 循环</td><td>不透明度 0.6 ↔ 1，减弱动态时静止</td></tr>
+    </tbody>
+  </table>
+  <div class="do-dont" style="margin-top:var(--space-lg)">
+    <div class="card"><b>规则</b><ul>
+      <li>一次只动一个主体。</li>
+      <li>动效表达因果：右下角按钮触发的 Toast 出现在右下角。</li>
+      <li>时长不随数量变。100 个实例和 3 个实例的动画一样长。</li>
+      <li>只改 transform 与 opacity，不动布局。</li>
+      <li>新动画打断旧动画，不排队。</li>
+    </ul></div>
+    <div class="card"><b class="no">禁止</b><ul>
+      <li>抖动、闪烁、弹跳超过一次。</li>
+      <li>模态进度窗。</li>
+      <li>背景元素跟着主体一起大幅移动。</li>
+      <li>动画期间锁住输入。</li>
+      <li>超过 50 项还做错峰。</li>
+    </ul></div>
+  </div>
+</section>
+
+<section class="doc" id="states">
+  <div class="eyebrow">状态与渐进披露</div>
+  <h2>高级功能怎么藏，状态怎么给</h2>
+  <p class="lead">三层披露：直接可见、一次点击、设置页。默认值永远能用，不做「专家模式」开关。四种状态都要画：空、加载、进度、错误，每一种都要给出下一步动作。</p>
+  <table class="rules">
+    <thead><tr><th>层</th><th>在哪</th><th>放什么</th><th>例子</th></tr></thead>
+    <tbody>
+      <tr><td>直接可见</td><td>页面上</td><td>90% 用户每次都用的</td><td>开始游戏、新建、导入、搜索模组</td></tr>
+      <tr><td>一次点击</td><td>「···」菜单、右键、折叠区</td><td>偶尔用、懂的人才用</td><td>打开文件夹、复制实例、加载器版本、JVM 参数</td></tr>
+      <tr><td>设置页</td><td>偏好设置</td><td>装好后几乎不再碰</td><td>下载源、代理、Java 列表、强调色</td></tr>
+    </tbody>
+  </table>
+  <h3>状态</h3>
+  <table class="rules">
+    <thead><tr><th>状态</th><th>怎么做</th><th>不这么做</th></tr></thead>
+    <tbody>
+      <tr><td>加载 &lt; 300 ms</td><td>什么都不显示</td><td>闪一下进度环</td></tr>
+      <tr><td>加载 ≥ 300 ms</td><td>原位进度环 + 一句话</td><td>整页遮罩</td></tr>
+      <tr><td>列表加载</td><td>骨架 3 行，standard 淡入真实内容</td><td>空白再突然出现</td></tr>
+      <tr><td>有进度</td><td>线性进度条 + 数字，原位</td><td>模态进度窗</td></tr>
+      <tr><td>成功</td><td>emphasized 一次 + Toast</td><td>弹窗说「成功」</td></tr>
+      <tr><td>可恢复错误</td><td>原位红字 + 一个修复按钮</td><td>弹窗</td></tr>
+      <tr><td>不可恢复错误</td><td>系统 alert「出了点问题」+ 翻译后的原因</td><td>显示原始错误串</td></tr>
+    </tbody>
+  </table>
+  <h3>文案</h3>
+  <div class="do-dont">
+    <div class="card"><b>这样写</b><ul>
+      <li>「删除实例」「安装」「开始游戏」</li>
+      <li>「无法连接 modrinth.com，请检查网络」</li>
+      <li>「整合包已导入」</li>
+      <li>「内存越大加载越快，但不要超过物理内存的一半。」</li>
+    </ul></div>
+    <div class="card"><b class="no">不这样写</b><ul>
+      <li>「确定」「OK」「是 / 否」</li>
+      <li>「错误：HTTP 503」</li>
+      <li>「导入成功！」</li>
+      <li>「-Xmx4G（JVM 堆上限）」出现在主路径</li>
+    </ul></div>
+  </div>
+</section>
+
+<section class="doc" id="checklist">
+  <div class="eyebrow">清单</div>
+  <h2>提 PR 前自查</h2>
+  <div class="card">
+    <ol style="margin:0;padding-left:20px;line-height:2;color:var(--text-secondary)">
+      <li>这页只有一个强调色按钮吗。</li>
+      <li>不改任何默认值能完成任务吗。</li>
+      <li>高级项在「···」、折叠区或设置里吗，带后果说明吗。</li>
+      <li>空状态、加载、进度、错误四种状态都画了吗，都有下一步动作吗。</li>
+      <li>每个状态变化都用了 Bark 动效令牌吗，减弱动态时正常吗。</li>
+      <li>尺寸、颜色、间距全部来自令牌吗，没有魔法数字吗。</li>
+      <li>三语文案都在 <code>bark/i18n/</code> 里吗。</li>
+      <li>键盘走一遍能完成吗，Esc 和回车对吗。</li>
+      <li>深色模式看过了吗。</li>
+      <li>和另一端摆在一起，除了字体和窗口边框还有区别吗。</li>
+    </ol>
+  </div>
+</section>
+
+<footer class="doc-foot">Bark · Yumu 设计令牌与界面规范 · 规范正文见 bark/guidelines.md，令牌见 bark/tokens/</footer>
+</main>
+
+<script>
+/* ===== 令牌（与 bark/tokens/*.json 保持一致） ===== */
+const TOKENS = {
+  color: {
+    "background.canvas":  { light: "#F6F4F0", dark: "#1B1A18", v: "--bg-canvas" },
+    "background.sidebar": { light: "#EFECE6", dark: "#151412", v: "--bg-sidebar" },
+    "surface.default":    { light: "#FFFFFF", dark: "#242321", v: "--surface-default" },
+    "surface.elevated":   { light: "#FFFFFF", dark: "#2C2B28", v: "--surface-elevated" },
+    "surface.sunken":     { light: "#ECE9E3", dark: "#151412", v: "--surface-sunken" },
+    "surface.hover":      { light: "rgba(0,0,0,0.04)", dark: "rgba(255,255,255,0.05)", v: "--surface-hover" },
+    "surface.pressed":    { light: "rgba(0,0,0,0.08)", dark: "rgba(255,255,255,0.09)", v: "--surface-pressed" },
+    "border.subtle":      { light: "rgba(0,0,0,0.06)", dark: "rgba(255,255,255,0.08)", v: "--border-subtle" },
+    "border.strong":      { light: "rgba(0,0,0,0.14)", dark: "rgba(255,255,255,0.16)", v: "--border-strong" },
+    "text.primary":       { light: "#1C1B19", dark: "#F2F0EC", v: "--text-primary" },
+    "text.secondary":     { light: "#6B6862", dark: "#A5A29B", v: "--text-secondary" },
+    "text.tertiary":      { light: "#9B978F", dark: "#6E6B65", v: "--text-tertiary" },
+    "text.onAccent":      { light: "#FFFFFF", dark: "#FFFFFF", v: "--text-on-accent" },
+    "accent.default":     { light: "#2F8A5A", dark: "#4FB57D", v: "--accent" },
+    "accent.hover":       { light: "#287A4F", dark: "#5EC28B", v: "--accent-hover" },
+    "accent.tint":        { light: "rgba(47,138,90,0.12)", dark: "rgba(79,181,125,0.16)", v: "--accent-tint" },
+    "status.success":     { light: "#2F8A5A", dark: "#4FB57D", v: "--success" },
+    "status.warning":     { light: "#C6882A", dark: "#E0A94A", v: "--warning" },
+    "status.danger":      { light: "#C9453B", dark: "#E26B61", v: "--danger" },
+    "status.dangerTint":  { light: "rgba(201,69,59,0.10)", dark: "rgba(226,107,97,0.16)", v: "--danger-tint" },
+  },
+  elevation: {
+    raised:  { light: "0 1px 2px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.06)", dark: "0 1px 2px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.35)", v: "--elev-raised" },
+    overlay: { light: "0 2px 6px rgba(0,0,0,0.08), 0 16px 48px rgba(0,0,0,0.16)", dark: "0 2px 6px rgba(0,0,0,0.5), 0 16px 48px rgba(0,0,0,0.6)", v: "--elev-overlay" },
+  },
+  type: { display: [28, 600], title: [20, 600], headline: [15, 600], body: [13, 400], callout: [12, 400], caption: [11, 400] },
+  space: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 },
+  radius: { sm: 6, md: 10, lg: 14, xl: 20 },
+};
+
+/* ===== 图标（线性，1.5 描边） ===== */
+const ICONS = {
+  cube: '<path d="M12 3 4 7v10l8 4 8-4V7l-8-4z"/><path d="M4 7l8 4 8-4M12 11v10"/>',
+  puzzle: '<path d="M10 4a2 2 0 1 1 4 0v1h3a1 1 0 0 1 1 1v3h-1a2 2 0 1 0 0 4h1v3a1 1 0 0 1-1 1h-3v-1a2 2 0 1 0-4 0v1H7a1 1 0 0 1-1-1v-3h1a2 2 0 1 0 0-4H6V6a1 1 0 0 1 1-1h3V4z"/>',
+  play: '<path d="M7 5v14l11-7z" fill="currentColor" stroke="none"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  import: '<path d="M12 3v11M8 10l4 4 4-4"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>',
+  package: '<path d="M3 8l9-4 9 4v9l-9 4-9-4V8z"/><path d="M3 8l9 4 9-4M12 12v9M7.5 6l9 4"/>',
+  folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>',
+  search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>',
+  more: '<circle cx="6" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="18" cy="12" r="1.2" fill="currentColor"/>',
+  trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',
+  check: '<path d="M5 12l5 5L20 7"/>',
+  chevron: '<path d="M9 6l6 6-6 6"/>',
+  warning: '<path d="M12 4 2.5 20h19L12 4z"/><path d="M12 10v4M12 17v.5"/>',
+  moon: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
+  motion: '<path d="M4 12h6M4 7h10M4 17h8"/><circle cx="17" cy="12" r="3"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h9"/>',
+  pen: '<path d="M4 20h4l10-10-4-4L4 16v4z"/>',
+  log: '<path d="M6 4h9l4 4v12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M9 13h6M9 17h6"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  stop: '<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none"/>',
+};
+const icon = (n, s = 16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]}</svg>`;
+function hydrateIcons(root = document) {
+  root.querySelectorAll('[data-icon]').forEach(el => { el.innerHTML = icon(el.dataset.icon); el.style.display = 'inline-flex'; });
+}
+
+/* ===== 主题 ===== */
+const root = document.documentElement;
+function applyTheme(mode) {
+  root.dataset.theme = mode;
+  for (const group of [TOKENS.color, TOKENS.elevation]) for (const k in group) root.style.setProperty(group[k].v, group[k][mode]);
+  const btn = document.getElementById('themeBtn');
+  btn.setAttribute('aria-pressed', mode === 'dark');
+  btn.querySelector('.t').textContent = mode === 'dark' ? '浅色' : '深色';
+  try { localStorage.setItem('bark-theme', mode); } catch {}
+}
+let theme = 'light';
+try { theme = localStorage.getItem('bark-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); } catch {}
+applyTheme(theme);
+document.getElementById('themeBtn').onclick = () => applyTheme(root.dataset.theme === 'dark' ? 'light' : 'dark');
+
+const motionBtn = document.getElementById('motionBtn');
+function applyMotion(reduced) {
+  root.dataset.motion = reduced ? 'reduced' : 'full';
+  motionBtn.setAttribute('aria-pressed', reduced);
+}
+applyMotion(matchMedia('(prefers-reduced-motion: reduce)').matches);
+motionBtn.onclick = () => applyMotion(root.dataset.motion !== 'reduced');
+
+/* ===== 分段控件通用逻辑 ===== */
+function segmented(el, onChange) {
+  const thumb = el.querySelector('.thumb');
+  const buttons = [...el.querySelectorAll('button')];
+  function place(b) {
+    thumb.style.width = b.offsetWidth + 'px';
+    thumb.style.transform = `translateX(${b.offsetLeft - 2}px)`;
+  }
+  buttons.forEach(b => b.addEventListener('click', () => {
+    if (b.disabled) return;
+    buttons.forEach(x => x.setAttribute('aria-selected', x === b));
+    place(b);
+    onChange && onChange(b);
+  }));
+  requestAnimationFrame(() => place(buttons.find(b => b.getAttribute('aria-selected') === 'true') || buttons[0]));
+  return { select(i) { buttons[i].click(); }, place: () => place(buttons.find(b => b.getAttribute('aria-selected') === 'true') || buttons[0]) };
+}
+
+/* ===== 应用模拟器 ===== */
+const seed = () => [
+  { id: 'a', name: '生存服 2026', loader: 'Fabric', loaderVersion: '0.17.3', version: '26.3', lastPlayed: '昨天', playtime: '42 小时', mods: ['Sodium', 'Lithium', 'Iris Shaders', 'Mod Menu'] },
+  { id: 'b', name: '原版 26.3', loader: null, loaderVersion: '', version: '26.3', lastPlayed: '3 天前', playtime: '6 小时', mods: [] },
+  { id: 'c', name: 'Create 工业', loader: 'NeoForge', loaderVersion: '21.1.209', version: '1.21.1', lastPlayed: '从未', playtime: '0 分钟', mods: ['Create', 'JEI', 'Jade'] },
+];
+const PACKS = [
+  { name: 'Fabulously Optimized', by: 'robotkoer', dl: '2,310 万', desc: '一键优化原版性能，装上就比原版快。', c: '#5c8aa3' },
+  { name: 'Cobblemon', by: 'Cobblemon Team', dl: '620 万', desc: '在 Minecraft 里收集与对战宝可梦。', c: '#c75a4a' },
+  { name: 'Prominence II', by: 'ProminenceTeam', dl: '410 万', desc: 'RPG 向整合，任务、地牢与新维度。', c: '#7a5aa8' },
+  { name: 'Better MC', by: 'LunaPixelStudios', dl: '380 万', desc: '更丰富的原版体验，不改变核心玩法。', c: '#4a9a6a' },
+];
+const state = { instances: seed(), selected: 'a', tab: 0, activity: {}, importing: null, account: { name: 'Steve', kind: '微软' }, crash: null };
+
+const $ = (sel, r = document) => r.querySelector(sel);
+const listEl = $('#list'), selectionEl = $('#selection'), contentEl = $('#content'), overlays = $('#overlays'), importSlot = $('#importSlot');
+
+function renderList(opts = {}) {
+  listEl.querySelectorAll('.row').forEach(r => r.remove());
+  state.instances.forEach((ins, i) => {
+    const r = document.createElement('div');
+    r.className = 'row' + (opts.enter === ins.id ? ' enter pop' : '') + (opts.initial && i < 6 ? ' enter' : '');
+    if (opts.initial) r.style.animationDelay = (i * 20) + 'ms';
+    r.dataset.id = ins.id;
+    const act = state.activity[ins.id];
+    r.innerHTML = `${icon(ins.loader ? 'puzzle' : 'cube')}<div class="texts"><span>${ins.name}</span><small>${ins.version}</small></div>` +
+      (act === 'running' ? '<span class="dot success breathe" title="运行中"></span>' : act ? '<span class="spinner"></span>' : '');
+    r.addEventListener('click', () => select(ins.id));
+    r.addEventListener('contextmenu', e => { e.preventDefault(); contextMenu(e, ins); });
+    listEl.appendChild(r);
+  });
+  placeSelection();
+}
+function placeSelection() {
+  const row = listEl.querySelector(`.row[data-id="${state.selected}"]`);
+  if (!row) { selectionEl.style.opacity = 0; return; }
+  selectionEl.style.opacity = 1;
+  selectionEl.style.transform = `translateY(${row.offsetTop}px)`;
+}
+function select(id) {
+  if (state.selected === id) return;
+  state.selected = id; state.tab = 0;
+  placeSelection();
+  renderContent(true);
+}
+const current = () => state.instances.find(i => i.id === state.selected);
+
+function renderContent(animate) {
+  const ins = current();
+  $('#winTitle').textContent = ins ? ins.name : 'Yumu';
+  if (animate) {
+    const old = contentEl.firstElementChild;
+    if (old) { old.classList.add('out'); setTimeout(() => old.remove(), 320); }
+  } else contentEl.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'position:absolute;inset:0;padding:var(--space-xxl);display:flex;flex-direction:column;gap:var(--space-xl)';
+  wrap.className = 'pane';
+  if (!ins) {
+    wrap.innerHTML = `<div class="empty">${icon('cube', 56)}<h4>还没有实例</h4><p>新建一个实例，或者导入整合包，剩下的交给 Yumu。</p>
+      <div style="display:flex;gap:12px;margin-top:4px"><button class="btn primary large" data-act="new">新建实例</button><button class="btn large" data-act="browse">浏览整合包</button><button class="btn large" data-act="drop">导入整合包</button></div>
+      <span class="hint">拖入 .mrpack 即可导入</span></div>`;
+    contentEl.appendChild(wrap);
+    wrap.querySelector('[data-act=new]').onclick = openNewSheet;
+    wrap.querySelector('[data-act=browse]').onclick = openBrowser;
+    wrap.querySelector('[data-act=drop]').onclick = simulateDrop;
+    return;
+  }
+  const sub = `${ins.loader ? ins.loader + ' ' + ins.loaderVersion : '原版'} · ${ins.version}`;
+  wrap.innerHTML = `
+    <div class="detail-header">
+      <div class="art">${icon(ins.loader ? 'puzzle' : 'cube', 32)}</div>
+      <div><div class="name">${ins.name}</div><div class="sub">${sub}</div></div>
+      <div class="actions"><button class="btn">${icon('folder')}打开文件夹</button><button class="btn icon" id="moreBtn" title="更多">${icon('more')}</button></div>
+    </div>
+    <div class="segmented" id="tabs"><div class="thumb"></div><button aria-selected="${state.tab===0}">概览</button><button aria-selected="${state.tab===1}">模组</button><button aria-selected="${state.tab===2}">资源</button><button aria-selected="${state.tab===3}">日志</button></div>
+    <div class="detail-body" id="tabBody"></div>
+    <div class="footer"><div class="status" id="status"></div><button class="btn primary large" id="playBtn">${icon('play')}开始游戏</button></div>`;
+  contentEl.appendChild(wrap);
+  segmented(wrap.querySelector('#tabs'), b => { state.tab = [...b.parentElement.querySelectorAll('button')].indexOf(b); renderTab(wrap, true); });
+  renderTab(wrap, false);
+  renderStatus(wrap);
+  wrap.querySelector('#playBtn').onclick = () => play(ins.id);
+  wrap.querySelector('#moreBtn').onclick = e => moreMenu(e, ins);
+}
+function renderTab(wrap, animate) {
+  const ins = current(); const body = wrap.querySelector('#tabBody');
+  const old = body.firstElementChild;
+  if (old && animate) { old.classList.add('out'); setTimeout(() => old.remove(), 320); } else if (old) old.remove();
+  const pane = document.createElement('div'); pane.className = 'pane';
+  if (state.tab === 0) {
+    pane.innerHTML = `<dl class="kv"><dt>上次游玩</dt><dd>${ins.lastPlayed}</dd><dt>游玩时长</dt><dd>${ins.playtime}</dd><dt>模组</dt><dd>${ins.mods.length ? ins.mods.length + ' 个' : '无'}</dd></dl>`;
+  } else if (state.tab === 1) {
+    if (!ins.loader) pane.innerHTML = `<div class="hint-box"><span>这是原版实例。新建实例时选择 Fabric 或 Quilt 才能使用模组。</span><button class="btn" data-act="new">新建一个 Fabric 实例</button></div>`;
+    else pane.innerHTML = `<div class="modlist">${ins.mods.map(m => `<div class="row">${icon('puzzle')}<div class="texts"><span>${m}</span><small>${ins.version} · ${ins.loader}</small></div><button class="switch" aria-checked="true" data-switch></button></div>`).join('')}</div>
+      <div class="field" style="margin-top:4px">${icon('search')}<input placeholder="搜索 Modrinth…"></div>
+      <div class="modlist"><div class="row">${icon('puzzle')}<div class="texts"><span>Continuity</span><small>连接纹理 · 310 万次下载</small></div><button class="btn">安装</button></div><div class="row">${icon('puzzle')}<div class="texts"><span>Entity Culling</span><small>性能 · 2,800 万次下载</small></div><span class="tag accent">已安装</span></div></div>`;
+  } else if (state.tab === 2) {
+    pane.innerHTML = `<div class="hint-box" style="flex-direction:row;align-items:center;justify-content:space-between"><div><b style="color:var(--text-primary)">光影包</b><div>这里还什么都没有。</div></div><button class="btn">添加…</button></div>
+      <div class="hint-box" style="flex-direction:row;align-items:center;justify-content:space-between"><div><b style="color:var(--text-primary)">资源包</b><div>这里还什么都没有。</div></div><button class="btn">添加…</button></div>`;
+  } else {
+    pane.innerHTML = `<div class="skeleton"></div><div class="skeleton" style="width:80%"></div><div class="skeleton" style="width:60%"></div><div style="display:flex;align-items:center;gap:8px;color:var(--text-secondary)"><span class="spinner"></span>正在读取最近一次运行的日志…</div>`;
+  }
+  body.appendChild(pane);
+  pane.querySelectorAll('[data-switch]').forEach(bindSwitch);
+  const n = pane.querySelector('[data-act=new]'); if (n) n.onclick = () => openNewSheet('Fabric');
+}
+function renderStatus(wrap) {
+  const ins = current(); if (!ins) return;
+  const st = wrap.querySelector('#status'), btn = wrap.querySelector('#playBtn');
+  const act = state.activity[ins.id];
+  btn.disabled = act === 'preparing' || act === 'installing';
+  if (act === 'running') { btn.className = 'btn large'; btn.innerHTML = icon('stop') + '结束游戏'; }
+  else { btn.className = 'btn primary large'; btn.innerHTML = icon('play') + '开始游戏'; }
+  if (act === 'preparing') st.innerHTML = `<span class="spinner"></span>准备中…`;
+  else if (act === 'installing') st.innerHTML = `<div class="bar"><span class="num" id="instNum">正在安装… 0 MB / 412 MB</span><div class="progress"><i id="instBar"></i></div></div>`;
+  else if (act === 'running') st.innerHTML = `<span class="dot success breathe"></span><span class="success">运行中</span>`;
+  else if (state.crash === ins.id) st.innerHTML = `<div class="danger-text">${icon('warning')}<span>游戏因内存不足退出。</span><button class="btn">把内存调到 4 GB</button><button class="btn text">打开日志</button></div>`;
+  else st.innerHTML = '';
+}
+function play(id) {
+  const ins = state.instances.find(i => i.id === id);
+  if (state.activity[id] === 'running') { delete state.activity[id]; refreshAll(); return; }
+  state.crash = null;
+  state.activity[id] = 'preparing'; refreshAll();
+  setTimeout(() => {
+    state.activity[id] = 'installing'; refreshAll();
+    let done = 0; const total = 412;
+    const t = setInterval(() => {
+      done = Math.min(total, done + 18 + Math.random() * 40);
+      const bar = $('#instBar'), num = $('#instNum');
+      if (bar) { bar.style.width = (done / total * 100) + '%'; num.textContent = `正在安装… ${Math.round(done)} MB / ${total} MB`; }
+      if (done >= total) { clearInterval(t); setTimeout(() => { state.activity[id] = 'running'; ins.lastPlayed = '刚刚'; refreshAll(); }, 350); }
+    }, 180);
+  }, 800);
+}
+function refreshAll() { renderList(); const w = contentEl.querySelector('.pane:not(.out)'); if (w && current()) renderStatus(w); if (!current()) renderContent(false); }
+
+function bindSwitch(b) { b.onclick = () => b.setAttribute('aria-checked', b.getAttribute('aria-checked') !== 'true'); }
+
+/* 菜单 */
+function closeMenus() { overlays.querySelectorAll('.menu, .popover').forEach(m => m.remove()); }
+function menuAt(x, y, items) {
+  closeMenus();
+  const m = document.createElement('div'); m.className = 'menu';
+  const r = $('#win').getBoundingClientRect(); const scale = r.width / 1060;
+  m.style.left = (x - r.left) / scale + 'px'; m.style.top = (y - r.top) / scale + 'px';
+  items.forEach(it => {
+    if (it === '-') { m.appendChild(document.createElement('hr')); return; }
+    const b = document.createElement('button'); b.className = it.danger ? 'danger' : ''; b.innerHTML = icon(it.icon) + it.label; b.onclick = () => { closeMenus(); it.run && it.run(); }; m.appendChild(b);
+  });
+  overlays.appendChild(m);
+  if (parseFloat(m.style.left) + 190 > 1060) m.style.left = (1060 - 196) + 'px';
+}
+function contextMenu(e, ins) {
+  menuAt(e.clientX, e.clientY, [
+    { icon: 'play', label: '开始游戏', run: () => { select(ins.id); play(ins.id); } },
+    { icon: 'folder', label: '打开文件夹' }, '-',
+    { icon: 'copy', label: '复制实例' }, { icon: 'pen', label: '重命名…' }, { icon: 'gear', label: '实例设置…', run: () => openInstanceSettings(ins) }, '-',
+    { icon: 'trash', label: '删除实例', danger: true, run: () => confirmDelete(ins) },
+  ]);
+}
+function moreMenu(e, ins) {
+  const r = e.currentTarget.getBoundingClientRect();
+  menuAt(r.left - 150, r.bottom + 4, [
+    { icon: 'gear', label: '实例设置…', run: () => openInstanceSettings(ins) }, { icon: 'copy', label: '复制实例' }, { icon: 'pen', label: '重命名…' }, { icon: 'log', label: '导出为 .mrpack…' }, '-',
+    { icon: 'trash', label: '删除实例', danger: true, run: () => confirmDelete(ins) },
+  ]);
+}
+document.addEventListener('pointerdown', e => { if (!e.target.closest('.menu, .popover, #accountBar')) closeMenus(); });
+
+/* Sheet */
+function openSheet(html, cls = '') {
+  const scrim = document.createElement('div'); scrim.className = 'scrim';
+  scrim.innerHTML = `<div class="sheet ${cls}" role="dialog">${html}</div>`;
+  overlays.appendChild(scrim);
+  const close = () => { scrim.classList.add('out'); setTimeout(() => scrim.remove(), 320); document.removeEventListener('keydown', onKey); };
+  const onKey = e => { if (e.key === 'Escape') close(); if (e.key === 'Enter' && !e.target.matches('select')) { const p = scrim.querySelector('.btn.primary:not(:disabled)'); p && p.click(); } };
+  document.addEventListener('keydown', onKey);
+  scrim.addEventListener('pointerdown', e => { if (e.target === scrim) close(); });
+  scrim.querySelectorAll('[data-close]').forEach(b => b.onclick = close);
+  hydrateIcons(scrim);
+  return { scrim, close, sheet: scrim.firstElementChild };
+}
+function disclosureHTML(open = false) {
+  return `<div class="disclosure" data-open="${open}"><button type="button">${icon('chevron')}高级选项</button><div class="body-wrap"><div><div class="inner">
+    <label>加载器版本</label><div class="field select"><select><option>推荐（0.17.3）</option><option>0.17.2</option></select></div>
+    <label>Java</label><div class="field select"><select><option>自动（Mojang 运行时 21）</option><option>系统 Java 21</option><option>自定义路径…</option></select></div>
+    <label>内存</label><div class="field"><input value="4 GB"></div><small>内存越大加载越快，但不要超过物理内存的一半。</small>
+    <label>JVM 参数</label><div class="field"><input placeholder="留空用默认值"></div>
+  </div></div></div></div>`;
+}
+function bindDisclosure(root) {
+  root.querySelectorAll('.disclosure').forEach(d => d.querySelector(':scope > button').onclick = () => {
+    const open = d.dataset.open !== 'true'; d.dataset.open = open; try { localStorage.setItem('bark-adv', open); } catch {}
+  });
+}
+function openNewSheet(loaderPreset) {
+  let remembered = false; try { remembered = localStorage.getItem('bark-adv') === 'true'; } catch {}
+  const { sheet, close } = openSheet(`
+    <h4>新建实例</h4>
+    <div class="form">
+      <label>名称</label><div class="field"><input id="nName" placeholder="26.3"></div>
+      <label>版本</label><div class="field select"><select id="nVer"><option>26.3（最新）</option><option>26.2</option><option>1.21.1</option><option>显示全部版本…</option></select></div>
+      <label>模组加载器</label><div class="segmented" id="nLoader"><div class="thumb"></div><button aria-selected="true">原版</button><button>Fabric</button><button>Quilt</button><button>Forge</button><button>NeoForge</button></div>
+    </div>
+    ${disclosureHTML(remembered)}
+    <div class="buttons"><button class="btn" data-close>取消</button><button class="btn primary" id="nCreate">创建</button></div>`);
+  const seg = segmented(sheet.querySelector('#nLoader'));
+  if (loaderPreset) seg.select(['原版','Fabric','Quilt','Forge','NeoForge'].indexOf(loaderPreset));
+  bindDisclosure(sheet);
+  setTimeout(() => sheet.querySelector('#nName').focus(), 50);
+  sheet.querySelector('#nCreate').onclick = () => {
+    const loaderBtn = sheet.querySelector('#nLoader [aria-selected="true"]').textContent;
+    const ver = sheet.querySelector('#nVer').value.replace(/（.*）/, '').replace('显示全部版本…', '26.3');
+    const name = sheet.querySelector('#nName').value.trim() || ver;
+    const id = 'n' + Date.now();
+    state.instances.push({ id, name, loader: loaderBtn === '原版' ? null : loaderBtn, loaderVersion: loaderBtn === '原版' ? '' : '最新', version: ver, lastPlayed: '从未', playtime: '0 分钟', mods: [] });
+    close();
+    state.selected = id; state.tab = 0;
+    renderList({ enter: id }); renderContent(true);
+  };
+}
+function openInstanceSettings(ins) {
+  const { sheet } = openSheet(`<h4>${ins.name} 的设置</h4>
+    <div class="form"><label>名称</label><div class="field"><input value="${ins.name}"></div><label>分辨率</label><div class="field select"><select><option>跟随窗口</option><option>1920 × 1080</option><option>全屏</option></select></div><label>启动后</label><div class="field select"><select><option>保持启动器打开</option><option>隐藏启动器</option></select></div></div>
+    ${disclosureHTML(false)}
+    <div class="buttons"><button class="btn" data-close>取消</button><button class="btn primary" data-close>保存</button></div>`);
+  bindDisclosure(sheet);
+}
+function confirmDelete(ins) {
+  const { close } = openSheet(`<h4>删除“${ins.name}”？</h4><p>它的存档和设置也会一起删除。</p>
+    <div class="buttons"><button class="btn" data-close>取消</button><button class="btn danger" id="doDel">删除实例</button></div>`, 'confirm');
+  overlays.querySelector('#doDel').onclick = () => {
+    close();
+    const row = listEl.querySelector(`.row[data-id="${ins.id}"]`); if (row) row.classList.add('leave');
+    setTimeout(() => {
+      state.instances = state.instances.filter(i => i.id !== ins.id);
+      if (state.selected === ins.id) { state.selected = state.instances[0]?.id || null; renderContent(true); }
+      renderList();
+    }, 280);
+  };
+}
+function openBrowser() {
+  const { sheet, close } = openSheet(`<h4>浏览整合包</h4>
+    <div class="field">${icon('search')}<input placeholder="搜索 Modrinth 整合包…" autofocus></div>
+    <div class="packgrid">${PACKS.map((p, i) => `<div class="card pack"><div class="picon" style="background:${p.c}"></div><div class="ptexts"><b>${p.name}</b><small>${p.by} · ${p.dl} 次下载</small><p>${p.desc}</p></div><button class="btn" data-pack="${i}">安装</button></div>`).join('')}</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;color:var(--text-secondary);font-size:var(--type-callout)"><span>安装会新建一个实例，整合包需要的东西全部自动装好。</span><button class="btn" data-close>关闭</button></div>`, 'browser');
+  sheet.querySelectorAll('[data-pack]').forEach(b => b.onclick = () => { close(); importPack(PACKS[b.dataset.pack].name); });
+}
+
+/* 拖放与导入 */
+function simulateDrop() {
+  const d = document.createElement('div'); d.className = 'drop';
+  d.innerHTML = `<div class="box">${icon('import', 48)}拖入 .mrpack 即可导入</div>`;
+  overlays.appendChild(d);
+  setTimeout(() => { d.classList.add('out'); setTimeout(() => d.remove(), 200); importPack('Fabulously Optimized'); }, 1100);
+}
+function importPack(name) {
+  if (state.importing) return;
+  state.importing = name;
+  importSlot.innerHTML = `<div class="import-status"><span id="impText">正在导入整合包… 0%</span><div class="progress"><i id="impBar"></i></div></div>`;
+  let p = 0;
+  const t = setInterval(() => {
+    p = Math.min(100, p + 4 + Math.random() * 9);
+    const bar = $('#impBar'), txt = $('#impText');
+    if (bar) { bar.style.width = p + '%'; txt.textContent = `正在导入整合包… ${Math.round(p)}%`; }
+    if (p >= 100) {
+      clearInterval(t);
+      setTimeout(() => {
+        const s = importSlot.firstElementChild; if (s) { s.classList.add('leave'); setTimeout(() => s.remove(), 300); }
+        const id = 'p' + Date.now();
+        state.instances.push({ id, name, loader: 'Fabric', loaderVersion: '0.17.3', version: '26.3', lastPlayed: '从未', playtime: '0 分钟', mods: ['Sodium', 'Lithium', 'FerriteCore', 'ModernFix', 'Iris Shaders'] });
+        state.importing = null; state.selected = id; state.tab = 0;
+        renderList({ enter: id }); renderContent(true);
+        toast('整合包已导入');
+      }, 300);
+    }
+  }, 160);
+}
+function toast(text) {
+  overlays.querySelectorAll('.toast').forEach(t => t.remove());
+  const t = document.createElement('div'); t.className = 'toast'; t.innerHTML = icon('check') + text;
+  overlays.appendChild(t);
+  setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 200); }, 3000);
+}
+
+/* 账号 */
+$('#accountBar').onclick = () => {
+  if (overlays.querySelector('.popover')) { closeMenus(); return; }
+  closeMenus();
+  const p = document.createElement('div'); p.className = 'popover';
+  const accounts = [{ name: 'Steve', kind: '微软' }, { name: 'Alex', kind: '离线' }];
+  p.innerHTML = accounts.map(a => `<div class="row" data-acc="${a.name}"><div class="avatar" style="width:24px;height:24px"></div><div class="texts"><span>${a.name}</span><small>${a.kind}</small></div>${a.name === state.account.name ? icon('check') : ''}</div>`).join('') +
+    `<hr style="border:0;border-top:1px solid var(--border-subtle);margin:4px 8px"><div class="row" style="height:32px;color:var(--accent)">${icon('plus')}<div class="texts"><span>添加账号…</span></div></div>`;
+  p.querySelectorAll('[data-acc]').forEach(r => r.onclick = () => { const a = accounts.find(x => x.name === r.dataset.acc); state.account = a; $('#accountName').textContent = a.name; $('#accountKind').textContent = a.kind; closeMenus(); });
+  overlays.appendChild(p);
+};
+
+/* 工具栏与场景按钮 */
+$('#tbNew').onclick = () => openNewSheet();
+$('#tbBrowse').onclick = openBrowser;
+$('#tbImport').onclick = simulateDrop;
+$('#dropBtn').onclick = simulateDrop;
+$('#crashBtn').onclick = () => { if (!current()) return; delete state.activity[state.selected]; state.crash = state.selected; refreshAll(); };
+$('#emptyBtn').onclick = () => { state.instances = []; state.selected = null; state.activity = {}; renderList(); renderContent(true); };
+$('#resetBtn').onclick = () => { Object.assign(state, { instances: seed(), selected: 'a', tab: 0, activity: {}, importing: null, crash: null }); importSlot.innerHTML = ''; overlays.innerHTML = ''; renderList({ initial: true }); renderContent(false); };
+
+segmented($('#frameSeg'), b => { $('#win').dataset.frame = b.dataset.frame; });
+
+/* 窄屏时缩放窗口 */
+function fitStage() {
+  const stage = $('.stage'); const fit = $('#stageFit');
+  const scale = Math.min(1, stage.clientWidth / 1060);
+  fit.style.transform = `scale(${scale})`;
+  stage.style.height = (660 * scale) + 'px';
+}
+addEventListener('resize', fitStage);
+
+/* ===== 令牌展示 ===== */
+$('#swatches').innerHTML = Object.entries(TOKENS.color).map(([k, t]) => `<div class="swatch"><div class="color" style="background:var(--surface-sunken)"><i style="background:${t.light}"></i><i style="background:${t.dark}"></i></div><div class="meta"><b>${k}</b><code>${t.light} · ${t.dark}</code></div></div>`).join('');
+$('#typeScale').innerHTML = Object.entries(TOKENS.type).map(([k, [s, w]]) => `<div class="typerow"><span class="k">${k}</span><span style="font-size:${s}px;font-weight:${w};line-height:1.3">原木 Yumu — 简洁、轻量、跨平台</span><span class="v">${s} / ${w}</span></div>`).join('');
+$('#spaceRow').innerHTML = Object.entries(TOKENS.space).map(([k, v]) => `<div class="sp"><i style="width:${v}px;height:${v}px"></i>${k} · ${v}</div>`).join('');
+$('#radiusRow').innerHTML = Object.entries(TOKENS.radius).map(([k, v]) => `<div class="r" style="border-radius:${v}px">${k} · ${v}</div>`).join('');
+
+/* ===== 组件画廊交互 ===== */
+document.querySelectorAll('[data-seg]').forEach(el => segmented(el));
+document.querySelectorAll('[data-switch]').forEach(bindSwitch);
+(function galleryProgress() {
+  let p = 0; const bar = $('#gProg'), num = $('#gProgNum');
+  setInterval(() => { p = p >= 100 ? 0 : Math.min(100, p + 7); bar.style.width = p + '%'; num.textContent = `${Math.round(412 * p / 100)} MB / 412 MB`; }, 600);
+})();
+
+/* ===== 动效实验台 ===== */
+document.querySelectorAll('[data-motion-demo]').forEach(card => {
+  const ball = card.querySelector('.ball');
+  const go = () => { ball.classList.remove('moved'); requestAnimationFrame(() => requestAnimationFrame(() => ball.classList.add('moved'))); setTimeout(() => ball.classList.remove('moved'), 1400); };
+  card.querySelector('[data-play]').onclick = go; ball.onclick = go;
+});
+$('#staggerPlay').onclick = () => {
+  const d = $('#staggerDemo'); d.classList.remove('play');
+  d.querySelectorAll('.row').forEach((r, i) => r.style.animationDelay = (i * 20) + 'ms');
+  requestAnimationFrame(() => requestAnimationFrame(() => d.classList.add('play')));
+};
+$('#staggerPlay').click();
+
+/* ===== 导航高亮 ===== */
+const navLinks = [...document.querySelectorAll('.doc-nav .links a')];
+const io = new IntersectionObserver(entries => entries.forEach(e => { if (e.isIntersecting) navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + e.target.id)); }), { rootMargin: '-40% 0px -55% 0px' });
+document.querySelectorAll('section.doc').forEach(s => io.observe(s));
+
+/* ===== 启动 ===== */
+hydrateIcons();
+renderList({ initial: true });
+renderContent(false);
+fitStage();
+addEventListener('load', () => { fitStage(); document.querySelectorAll('.segmented').forEach(el => { const t = el.querySelector('.thumb'); const b = el.querySelector('[aria-selected="true"]') || el.querySelector('button'); if (b) { t.style.width = b.offsetWidth + 'px'; t.style.transform = `translateX(${b.offsetLeft - 2}px)`; } }); });
+</script>
+</body>
+</html>

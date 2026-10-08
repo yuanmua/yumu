@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yumu 界面方案 · 选版</title>
+<style>
+:root { --bg: #F4F2ED; --fg: #1B1A17; --muted: #6A665E; --card: #fff; --line: rgba(0,0,0,.08); --accent: #2F8A5A; color-scheme: light dark; }
+@media (prefers-color-scheme: dark) { :root { --bg: #161513; --fg: #F1EFEA; --muted: #A3A098; --card: #211F1C; --line: rgba(255,255,255,.08); --accent: #4FB57D; } }
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", sans-serif; background: var(--bg); color: var(--fg); -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 56px 24px 80px; }
+.eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+h1 { font-size: 38px; line-height: 1.15; margin: 8px 0 12px; letter-spacing: -0.02em; font-weight: 700; }
+.lead { color: var(--muted); font-size: 16px; max-width: 720px; margin: 0 0 36px; }
+.versions { display: grid; gap: 28px; }
+.v { background: var(--card); border-radius: 22px; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 10px 40px rgba(0,0,0,.06), inset 0 0 0 1px var(--line); overflow: hidden; display: grid; grid-template-columns: 1fr 380px; }
+.v .shot { position: relative; background: #111; aspect-ratio: 16 / 10; overflow: hidden; }
+.v .shot iframe { position: absolute; inset: 0; width: 1280px; height: 800px; border: 0; transform-origin: top left; pointer-events: none; }
+.v .shot a.open { position: absolute; right: 14px; bottom: 14px; background: rgba(0,0,0,.6); color: #fff; padding: 8px 14px; border-radius: 999px; text-decoration: none; font-weight: 500; backdrop-filter: blur(10px); font-size: 13px; }
+.v .shot a.open:hover { background: rgba(0,0,0,.8); }
+.v .info { padding: 28px 28px 24px; display: flex; flex-direction: column; gap: 14px; }
+.v .num { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .06em; }
+.v .num i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); display: inline-block; }
+.v h2 { margin: 0; font-size: 26px; letter-spacing: -0.02em; font-weight: 700; }
+.v h2 small { font-weight: 500; color: var(--muted); font-size: 14px; margin-left: 8px; letter-spacing: 0; }
+.v p { margin: 0; color: var(--muted); }
+.v ul { margin: 0; padding-left: 18px; color: var(--muted); }
+.v li { margin: 4px 0; }
+.v li b { color: var(--fg); font-weight: 600; }
+.v .for { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+.v .for b { color: var(--fg); }
+.common { margin-top: 48px; display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+.common .card { background: var(--card); border-radius: 18px; padding: 22px 24px; box-shadow: inset 0 0 0 1px var(--line); }
+.common h3 { margin: 0 0 10px; font-size: 16px; }
+.common ul { margin: 0; padding-left: 18px; color: var(--muted); } .common li { margin: 4px 0; }
+.common li b { color: var(--fg); font-weight: 600; }
+.links { margin-top: 36px; color: var(--muted); font-size: 13px; }
+.links a { color: var(--accent); text-decoration: none; }
+@media (max-width: 900px) { .v { grid-template-columns: 1fr; } .common { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Yumu · 界面方案</div>
+  <h1>三个方向，选一个往下做。</h1>
+  <p class="lead" style="margin-bottom:12px;color:var(--fg)"><b>已选定：方案三 素木</b>，并吸收方案一的侧栏像素图标与下划线标签栏；数据带放在头部右侧。macOS 应用已按此实现。</p>
+  <p class="lead">三个方案是同一套数据、同一套控件、同一套行为，只有布局与气质不同。每个都能点：开始游戏、同时跑两个实例、新建、右键删除、拖入整合包、设置里换强调色和深浅色、欢迎页。页面底部的黑色浮条是设计控制台，不属于产品。</p>
+
+  <div class="versions">
+    <div class="v" style="--c:#2F8A5A">
+      <div class="shot"><iframe src="v1-forest.html#/instance/survival" loading="lazy" title="方案一"></iframe><a class="open" href="v1-forest.html" target="_blank">全屏打开 ↗</a></div>
+      <div class="info">
+        <span class="num"><i></i>方案一</span>
+        <h2>森林<small>沉浸封面</small></h2>
+        <p>每个实例有一张像素封面，铺满页面顶部，图标和标题压在封面上。头部有分量，一眼就知道现在在哪个实例里。</p>
+        <ul>
+          <li><b>侧栏列实例</b>，运行中的单独成组，收藏置顶。</li>
+          <li><b>封面头 + 下划线标签</b>，概览里有数据卡、存档卡、快速操作。</li>
+          <li><b>暖纸色 + 苔绿</b>，Minecraft 味最重的一版。</li>
+          <li>设置是独立页面，左侧分组导航。</li>
+        </ul>
+        <div class="for">适合：<b>想让启动器本身有游戏感</b>，愿意为每个实例配封面的用户。</div>
+      </div>
+    </div>
+
+    <div class="v" style="--c:#C47A2C">
+      <div class="shot"><iframe src="v2-workbench.html#/" loading="lazy" title="方案二"></iframe><a class="open" href="v2-workbench.html" target="_blank">全屏打开 ↗</a></div>
+      <div class="info">
+        <span class="num"><i></i>方案二</span>
+        <h2>工作台<small>图标栏 + 网格首页</small></h2>
+        <p>像 Xbox、Steam 库：左侧只有一列图标，首页是「继续游戏」大卡 + 实例网格。实例多的时候最好用，信息密度最高。</p>
+        <ul>
+          <li><b>首页</b>：继续游戏、正在运行、我的实例、推荐整合包。</li>
+          <li><b>实例页两栏</b>：左内容，右侧信息面板放存档与快速操作。</li>
+          <li><b>冷灰 + 琥珀</b>，更像工具。</li>
+          <li>账号有独立页面，预留皮肤预览。</li>
+        </ul>
+        <div class="for">适合：<b>实例很多、常切换</b>，把它当库管理的用户。</div>
+      </div>
+    </div>
+
+    <div class="v" style="--c:#3B6FD4">
+      <div class="shot"><iframe src="v3-editorial.html#/instance/survival" loading="lazy" title="方案三"></iframe><a class="open" href="v3-editorial.html" target="_blank">全屏打开 ↗</a></div>
+      <div class="info">
+        <span class="num"><i></i>方案三</span>
+        <h2>素木<small>居中版式</small></h2>
+        <p>像 macOS 系统设置和 Things：内容居中一栏，大图标、大标题、一条数据带、一排按钮。最安静，最像原生应用。</p>
+        <ul>
+          <li><b>头部是一个版块</b>：图标、标题、副标题、状态、按钮、数据带。</li>
+          <li><b>内容都是圆角分组卡</b>，列表是细线分隔，不是一张张卡。</li>
+          <li><b>近白 + 靛青</b>，细线、大字、少装饰。</li>
+          <li>整合包是大行列表，不是网格。</li>
+        </ul>
+        <div class="for">适合：<b>追求克制与原生感</b>，不想要封面图的用户。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="common">
+    <div class="card"><h3>三个方案都包含的页面</h3><ul>
+      <li><b>实例</b>：概览、模组、资源、存档、日志、实例设置（含高级折叠区、图标与封面个性化、删除）。</li>
+      <li><b>整合包</b>：搜索、分类筛选、安装即建实例。</li>
+      <li><b>设置</b>：通用、外观（主题、强调色、密度、动效、语言）、下载（源、并发、代理、缓存）、Java、账号、关于（版本、更新、链接、致谢）。</li>
+      <li><b>欢迎页</b>：三步引导，含「导入本机存档」。</li>
+      <li><b>空状态</b>、崩溃报告、拖放导入、多账号切换。</li>
+    </ul></div>
+    <div class="card"><h3>多实例运行时怎么显示</h3><ul>
+      <li>标题栏有「N 个实例运行中」胶囊，点开列出每个运行中的实例、已运行时间、查看与结束。</li>
+      <li>侧栏（方案一、三）顶部「正在运行」分组，呼吸绿点 + 计时；首页（方案二）有「正在运行」条，图标栏有数字角标。</li>
+      <li>运行中的实例页「开始游戏」变成「结束游戏」，其他实例仍可同时开始。</li>
+      <li>游戏退出或崩溃后，状态回到实例页并给出分类与一键建议。</li>
+    </ul></div>
+  </div>
+
+  <p class="links">令牌与组件的规范演示在 <a href="spec.html">spec.html</a>，规范正文在 <a href="../guidelines.md">bark/guidelines.md</a>。本地打开请用 <code>python3 -m http.server --directory bark/preview</code>，直接双击文件会加载不到共用脚本。</p>
+</div>
+<script>
+function fit() { document.querySelectorAll('.shot').forEach(s => { const f = s.querySelector('iframe'); f.style.transform = `scale(${s.clientWidth / 1280})`; }); }
+addEventListener('resize', fit); fit();
+</script>
+</body>
+</html>

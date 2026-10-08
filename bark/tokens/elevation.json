@@ -1,0 +1,5 @@
+{
+  "flat":  { "light": "none", "dark": "none" },
+  "raised": { "light": "0 1px 2px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.06)", "dark": "0 1px 2px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.35)" },
+  "overlay": { "light": "0 2px 6px rgba(0,0,0,0.08), 0 16px 48px rgba(0,0,0,0.16)", "dark": "0 2px 6px rgba(0,0,0,0.5), 0 16px 48px rgba(0,0,0,0.6)" }
+}

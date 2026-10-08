@@ -1,22 +1,38 @@
+import Darwin
 import Foundation
 import Observation
+import SwiftUI
 
+/// Getting an instance ready to launch; `running` is tracked per process in `processes`.
 enum Activity: Equatable, Sendable {
     case preparing
     case installing(done: UInt64, total: UInt64)
-    case running
+}
+
+/// One game process. The same instance may run several times at once.
+struct RunningProcess: Identifiable, Hashable, Sendable {
+    let pid: Int32
+    let instanceId: String
+    let startedAt: Date
+
+    var id: Int32 { pid }
 }
 
 private enum TaskKind {
     case launch(String)
     case versions
-    case search(SearchScope)
+    case search(SearchScope, append: Bool)
     case installMod(instance: String, project: String)
     case installResource(instance: String, kind: ResourceKind, project: String)
     case importPack
     case login
     case scan
     case importSave(instance: String)
+}
+
+/// What the detail area shows; instances are the default.
+enum Page: Hashable, Sendable {
+    case instances, packs, monitor
 }
 
 enum SearchScope: Hashable, Sendable {
@@ -30,11 +46,20 @@ enum SearchScope: Hashable, Sendable {
 final class AppModel {
     private(set) var instances: [InstanceSummary] = []
     var selectedID: String?
+    var page = Page.instances
+    var showingNew = false
+    var choosingImport = false
+    var sidebarVisibility = NavigationSplitViewVisibility.all
     private(set) var activity: [String: Activity] = [:]
+    private(set) var processes: [RunningProcess] = []
+    private(set) var stats: [Int32: ProcessStats] = [:]
     private(set) var versions: VersionList?
     private(set) var mods: [LocalMod] = []
     private(set) var resources: [ResourceKind: [ResourceFile]] = [:]
+    private(set) var worlds: [String: [WorldInfo]] = [:]
     private(set) var searchResults: [SearchScope: [SearchHit]] = [:]
+    private(set) var searchTotals: [SearchScope: UInt64] = [:]
+    private var searchQueries: [SearchScope: String] = [:]
     private(set) var searching: Set<SearchScope> = []
     private(set) var installingProjects: Set<String> = []
     private(set) var importing: Activity?
@@ -47,11 +72,23 @@ final class AppModel {
     private(set) var crashes: [String: (crash: Crash, logPath: String?)] = [:]
     private(set) var loginCode: LoginCode?
     private(set) var loggingIn = false
+    private(set) var favorites: Set<String> = Set(UserDefaults.standard.stringArray(forKey: Prefs.favorites) ?? [])
+    private(set) var icons: [String: PixelArt.Biome] = [:]
+    /// Modrinth artwork for installed mods (`project:<id>`) and instances made from modpacks (`instance:<id>`).
+    private(set) var iconURLs: [String: String] = UserDefaults.standard.dictionary(forKey: "iconURLs") as? [String: String] ?? [:]
+    private var pendingPackIcon: String?
+    private(set) var installingPack: String?
+    private var lookingUpIcons = false
+    private var modsRequest = 0
+
+    /// Physical memory in MB, the ceiling for every memory slider.
+    static let physicalMemoryMb = UInt32(min(ProcessInfo.processInfo.physicalMemory / 1_048_576, 262_144))
     var error: GrainError?
     let startupError: String?
 
     private let client: GrainClient?
     private var tasks: [String: TaskKind] = [:]
+    private var sampler = ProcessSampler()
 
     init() {
         do {
@@ -64,6 +101,55 @@ final class AppModel {
             client = nil
             startupError = (error as? GrainError)?.detail ?? error.localizedDescription
         }
+        Task { await listen() }
+    }
+
+    func iconURL(for instance: InstanceSummary) -> URL? {
+        iconURLs["instance:\(instance.id)"].flatMap(URL.init)
+    }
+
+    func iconURL(for mod: LocalMod) -> URL? {
+        (mod.record.flatMap { iconURLs["project:\($0.projectId)"] } ?? iconURLs[Self.fileKey(mod.fileName, mod.size)]).flatMap(URL.init)
+    }
+
+    func iconURL(for file: ResourceFile) -> URL? {
+        iconURLs[Self.fileKey(file.fileName, file.size)].flatMap(URL.init)
+    }
+
+    private static func fileKey(_ name: String, _ size: UInt64) -> String { "file:\(name):\(size)" }
+
+    private func rememberIcon(_ key: String, url: String?) {
+        guard let url, !url.isEmpty else { return }
+        iconURLs[key] = url
+        UserDefaults.standard.set(iconURLs, forKey: "iconURLs")
+    }
+
+    /// Matches files on disk to Modrinth projects by hash and remembers their artwork.
+    private func lookUpIcons(instanceId: String, mods: [LocalMod], resources: [(ResourceKind, ResourceFile)]) {
+        var items: [IconLookup.Item] = []
+        let game = LocalFiles.gameDirectory(instanceId)
+        for mod in mods where iconURL(for: mod) == nil {
+            items.append(.init(key: Self.fileKey(mod.fileName, mod.size), path: game.appending(path: "mods/\(mod.fileName)")))
+        }
+        for (kind, file) in resources where iconURL(for: file) == nil {
+            items.append(.init(key: Self.fileKey(file.fileName, file.size), path: game.appending(path: "\(kind.rawValue)/\(file.fileName)")))
+        }
+        let pending = items.filter { iconURLs[$0.key + ":checked"] == nil }
+        guard !pending.isEmpty, !lookingUpIcons else { return }
+        lookingUpIcons = true
+        Task {
+            let found = await IconLookup.resolve(pending)
+            for item in pending { iconURLs[item.key + ":checked"] = "1" }
+            for (key, url) in found { iconURLs[key] = url }
+            UserDefaults.standard.set(iconURLs, forKey: "iconURLs")
+            lookingUpIcons = false
+        }
+    }
+
+    func icon(for instance: InstanceSummary) -> PixelArt.Biome {
+        if let chosen = icons[instance.id] { return chosen }
+        if let raw = UserDefaults.standard.string(forKey: Prefs.icon(instance.id)), let saved = PixelArt.Biome(rawValue: raw) { return saved }
+        return PixelArt.defaultBiome(loader: instance.loaderKind, version: instance.gameVersion)
     }
 
     var selected: InstanceSummary? {
@@ -83,6 +169,18 @@ final class AppModel {
     var hasMicrosoftAccount: Bool { accounts.contains { $0.isMicrosoft } }
     var canAddOffline: Bool { hasMicrosoftAccount || offlineWithoutMicrosoft }
 
+    func processes(for instanceId: String) -> [RunningProcess] {
+        processes.filter { $0.instanceId == instanceId }
+    }
+
+    func isRunning(_ instanceId: String) -> Bool {
+        processes.contains { $0.instanceId == instanceId }
+    }
+
+    func instance(_ id: String) -> InstanceSummary? {
+        instances.first { $0.id == id }
+    }
+
     // MARK: Instances
 
     func refresh() {
@@ -98,11 +196,12 @@ final class AppModel {
         if selectedID == nil { selectedID = instances.first?.id }
     }
 
-    func createInstance(name: String, version: String, loader: String, loaderVersion: String = "") {
+    func createInstance(name: String, version: String, loader: String, loaderVersion: String = "", icon: PixelArt.Biome? = nil) {
         guard let client else { return }
         do {
-            let params = CreateParams(name: name, gameVersion: version, loaderKind: loader, loaderVersion: loaderVersion)
+            let params = CreateParams(name: uniqueName(name), gameVersion: version, loaderKind: loader, loaderVersion: loaderVersion)
             let created: IdParams = try client.call("instance.create", params)
+            if let icon { setIcon(created.id, biome: icon) }
             refresh()
             selectedID = created.id
         } catch {
@@ -110,16 +209,59 @@ final class AppModel {
         }
     }
 
+    /// "26.2" becomes "26.2 2" when an instance of that name exists; the core refuses duplicates.
+    private func uniqueName(_ name: String) -> String {
+        let taken = Set(instances.flatMap { [$0.name.lowercased(), $0.id.lowercased()] })
+        var candidate = name, counter = 2
+        while taken.contains(candidate.lowercased()) {
+            candidate = "\(name) \(counter)"
+            counter += 1
+        }
+        return candidate
+    }
+
     func deleteInstance(_ id: String) {
         guard let client else { return }
         do {
             let _: Empty = try client.call("instance.delete", IdParams(id: id))
+            favorites.remove(id)
+            saveFavorites()
+            UserDefaults.standard.removeObject(forKey: Prefs.icon(id))
+            icons[id] = nil
             refresh()
         } catch {
             report(error)
         }
     }
 
+    func rename(_ id: String, to name: String) {
+        guard let client else { return }
+        do {
+            var current: InstanceSettings = try client.call("instance.get", IdParams(id: id))
+            current.name = name
+            let _: Empty = try client.call("instance.update", current)
+            if settings?.id == id { settings = current }
+            refresh()
+        } catch {
+            report(error)
+        }
+    }
+
+    func toggleFavorite(_ id: String) {
+        if favorites.contains(id) { favorites.remove(id) } else { favorites.insert(id) }
+        saveFavorites()
+    }
+
+    func setIcon(_ id: String, biome: PixelArt.Biome) {
+        UserDefaults.standard.set(biome.rawValue, forKey: Prefs.icon(id))
+        icons[id] = biome
+    }
+
+    private func saveFavorites() {
+        UserDefaults.standard.set(Array(favorites), forKey: Prefs.favorites)
+    }
+
+    /// Launches another process even if the instance is already running; only a launch in progress blocks.
     func play(_ id: String) {
         guard let client, activity[id] == nil else { return }
         do {
@@ -129,6 +271,21 @@ final class AppModel {
             crashes[id] = nil
         } catch {
             report(error)
+        }
+    }
+
+    /// Asks the game to quit. The launcher signals the detached process directly; the core reports the exit.
+    func stop(pid: Int32) {
+        kill(pid, SIGTERM)
+    }
+
+    func stopAll(_ instanceId: String) {
+        for process in processes(for: instanceId) { stop(pid: process.pid) }
+    }
+
+    func sampleStats() {
+        for process in processes {
+            if let sample = sampler.sample(process.pid) { stats[process.pid] = sample }
         }
     }
 
@@ -155,15 +312,20 @@ final class AppModel {
         do {
             let _: Empty = try client.call("instance.update", updated)
             settings = updated
+            refresh()
         } catch {
             report(error)
         }
     }
 
+    func loadWorlds(_ id: String) {
+        worlds[id] = LocalFiles.worlds(id)
+    }
+
     // MARK: Discover
 
     func rescan() {
-        guard let client, !scanning else { return }
+        guard let client, !scanning, UserDefaults.standard.bool(forKey: Prefs.discover) else { return }
         do {
             tasks[try client.start("discover.scan", Empty())] = .scan
             scanning = true
@@ -184,12 +346,20 @@ final class AppModel {
 
     // MARK: Mods
 
+    /// Reads jar metadata off the main thread; a modpack with hundreds of mods must not freeze the window.
     func loadMods(_ id: String) {
         guard let client else { return }
-        do {
-            mods = try client.call("mod.listInstalled", IdParams(id: id))
-        } catch {
-            report(error)
+        modsRequest += 1
+        let request = modsRequest
+        Task {
+            do {
+                let loaded: [LocalMod] = try await Task.detached(priority: .userInitiated) { try client.call("mod.listInstalled", IdParams(id: id)) }.value
+                guard request == modsRequest else { return }
+                mods = loaded
+                lookUpIcons(instanceId: id, mods: loaded, resources: [])
+            } catch {
+                report(error)
+            }
         }
     }
 
@@ -213,28 +383,40 @@ final class AppModel {
         }
     }
 
-    func search(_ scope: SearchScope, query: String) {
-        guard let client else { return }
-        let params: SearchParams = switch scope {
+    func search(_ scope: SearchScope, query: String, offset: UInt32 = 0) {
+        guard let client, !searching.contains(scope) else { return }
+        var params: SearchParams = switch scope {
         case .mods(let id): SearchParams(id: id, projectType: "mod", query: query)
         case .resources(let id, let kind): SearchParams(id: id, projectType: kind.projectType, query: query)
         case .packs: SearchParams(id: nil, projectType: "modpack", query: query)
         }
+        params.offset = offset
+        searchQueries[scope] = query
         do {
-            tasks[try client.start("mod.search", params)] = .search(scope)
+            tasks[try client.start("mod.search", params)] = .search(scope, append: offset > 0)
             searching.insert(scope)
         } catch {
             report(error)
         }
     }
 
+    func canLoadMore(_ scope: SearchScope) -> Bool {
+        UInt64(searchResults[scope]?.count ?? 0) < (searchTotals[scope] ?? 0)
+    }
+
+    func loadMore(_ scope: SearchScope) {
+        search(scope, query: searchQueries[scope] ?? "", offset: UInt32(searchResults[scope]?.count ?? 0))
+    }
+
     func clearSearch(_ scope: SearchScope) {
         searchResults[scope] = nil
+        searchTotals[scope] = nil
         searching.remove(scope)
     }
 
-    func installMod(_ id: String, projectId: String) {
+    func installMod(_ id: String, projectId: String, iconUrl: String? = nil) {
         guard let client, !installingProjects.contains(projectId) else { return }
+        rememberIcon("project:\(projectId)", url: iconUrl)
         do {
             let taskId = try client.start("mod.install", ModInstallParams(id: id, projectId: projectId))
             tasks[taskId] = .installMod(instance: id, project: projectId)
@@ -270,6 +452,7 @@ final class AppModel {
                 report(error)
             }
         }
+        lookUpIcons(instanceId: id, mods: [], resources: ResourceKind.allCases.flatMap { kind in (resources[kind] ?? []).map { (kind, $0) } })
     }
 
     func addResource(_ id: String, kind: ResourceKind, url: URL) {
@@ -317,8 +500,10 @@ final class AppModel {
         }
     }
 
-    func installPack(projectId: String) {
+    func installPack(projectId: String, iconUrl: String? = nil) {
         guard let client, importing == nil else { return }
+        pendingPackIcon = iconUrl
+        installingPack = projectId
         do {
             tasks[try client.start("modpack.installModrinth", ProjectParams(projectId: projectId))] = .importPack
             importing = .preparing
@@ -387,7 +572,7 @@ final class AppModel {
 
     // MARK: Events
 
-    func listen() async {
+    private func listen() async {
         guard let client else { return }
         for await event in client.events {
             handle(event)
@@ -411,8 +596,10 @@ final class AppModel {
                 switch tasks.removeValue(forKey: taskId) {
                 case .versions:
                     versions = try decoder.decode(Envelope<TaskCompleted<VersionList>>.self, from: event.data).payload.result
-                case .search(let scope):
-                    searchResults[scope] = try decoder.decode(Envelope<TaskCompleted<SearchResult>>.self, from: event.data).payload.result.hits
+                case .search(let scope, let append):
+                    let result = try decoder.decode(Envelope<TaskCompleted<SearchResult>>.self, from: event.data).payload.result
+                    searchResults[scope] = append ? (searchResults[scope] ?? []) + result.hits : result.hits
+                    searchTotals[scope] = result.totalHits
                     searching.remove(scope)
                 case .installMod(let instance, let project):
                     installingProjects.remove(project)
@@ -427,14 +614,21 @@ final class AppModel {
                 case .scan:
                     scan = try decoder.decode(Envelope<TaskCompleted<Scan>>.self, from: event.data).payload.result
                     scanning = false
-                case .importSave:
+                case .importSave(let instance):
                     importingSave = false
+                    loadWorlds(instance)
                 case .importPack:
                     importing = nil
                     let created = try decoder.decode(Envelope<TaskCompleted<IdParams>>.self, from: event.data).payload.result
+                    rememberIcon("instance:\(created.id)", url: pendingPackIcon)
+                    pendingPackIcon = nil
+                    installingPack = nil
                     refresh()
                     selectedID = created.id
-                case .launch, nil:
+                case .launch(let id):
+                    // `game.started` carries the pid; the task only tells us preparation is over.
+                    activity[id] = nil
+                case nil:
                     break
                 }
             case "task.failed":
@@ -444,11 +638,19 @@ final class AppModel {
             case "task.cancelled":
                 finish(task: try decoder.decode(Envelope<TaskRef>.self, from: event.data).payload.taskId)
             case "game.started":
-                activity[try decoder.decode(Envelope<GameEvent>.self, from: event.data).payload.instanceId] = .running
+                let started = try decoder.decode(Envelope<GameEvent>.self, from: event.data).payload
+                activity[started.instanceId] = nil
+                processes.append(RunningProcess(pid: started.pid ?? -Int32(processes.count + 1), instanceId: started.instanceId, startedAt: Date()))
             case "game.exited":
                 let exited = try decoder.decode(Envelope<GameExited>.self, from: event.data).payload
-                activity[exited.instanceId] = nil
+                // The event has no pid yet, so the oldest process of that instance is the one assumed gone.
+                if let index = processes.firstIndex(where: { process in exited.pid.map { $0 == process.pid } ?? (process.instanceId == exited.instanceId) }) {
+                    let gone = processes.remove(at: index)
+                    stats[gone.pid] = nil
+                    sampler.forget(gone.pid)
+                }
                 if let crash = exited.crash { crashes[exited.instanceId] = (crash, exited.logPath) }
+                refresh()
             case "instance.changed":
                 refresh()
             case "account.loginCode":
@@ -466,9 +668,12 @@ final class AppModel {
     private func finish(task taskId: String) {
         switch tasks.removeValue(forKey: taskId) {
         case .launch(let id): activity[id] = nil
-        case .search(let scope): searching.remove(scope)
+        case .search(let scope, _): searching.remove(scope)
         case .installMod(_, let project), .installResource(_, _, let project): installingProjects.remove(project)
-        case .importPack: importing = nil
+        case .importPack:
+            importing = nil
+            pendingPackIcon = nil
+            installingPack = nil
         case .login:
             loggingIn = false
             loginCode = nil
@@ -481,4 +686,11 @@ final class AppModel {
     private func report(_ error: Error) {
         self.error = error as? GrainError ?? GrainError(kind: "INTERNAL", detail: error.localizedDescription)
     }
+}
+
+private struct ModrinthProject: Decodable {
+    let id: String
+    let iconUrl: String?
+
+    enum CodingKeys: String, CodingKey { case id, iconUrl = "icon_url" }
 }
