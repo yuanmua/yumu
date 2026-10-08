@@ -7,10 +7,8 @@ Yumu 是一个简洁、轻量、跨平台的 Minecraft 启动器。核心用 Rus
 - 体积小、占用低、启动快
 - 一键导入整合包，管理 Mod、光影、资源包
 - 界面美观，动画流畅，操作傻瓜式
-- 面向全球用户，默认跟随系统语言
-- 支持小众 CPU 架构（RISC-V、LoongArch 等）
 
-> 当前阶段：macOS 应用可新建实例、下载并启动原版；阶段 2（本机发现与账号）进行中。
+> 当前阶段：macOS 应用可新建原版 / Fabric / Quilt 实例，搜索安装 Modrinth 模组，导入 `.mrpack` 整合包，管理光影与资源包；阶段 2（本机发现与账号）进行中。
 
 ## 命名
 
@@ -50,6 +48,7 @@ yumu/
 - [国际化](docs/i18n.md)
 - [路线图](docs/roadmap.md)
 - [开发环境](docs/dev-setup.md)
+- [下载源与第三方服务合规](docs/compliance.md)
 - 代码规范：[Rust](docs/coding-standards/rust.md) · [Swift](docs/coding-standards/swift.md) · [Git 工作流](docs/coding-standards/git-workflow.md) · [Bark 设计令牌](docs/coding-standards/bark.md)
 - [架构决策记录 ADR](docs/adr/README.md)
 

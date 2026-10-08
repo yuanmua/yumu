@@ -8,8 +8,12 @@ pub mod install;
 pub mod instance;
 pub mod java;
 pub mod launch;
+pub mod loader;
+pub mod modpack;
+pub mod mods;
 pub mod mojang;
 pub mod platform;
+pub mod resource;
 pub mod rules;
 
 pub use error::{Error, Result};

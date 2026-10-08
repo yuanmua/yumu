@@ -93,6 +93,23 @@
       "args": [
         "detail"
       ]
+    },
+    "DOWNLOAD_HOST_NOT_ALLOWED": {
+      "args": [
+        "url"
+      ]
+    },
+    "MOD_NOT_COMPATIBLE": {
+      "args": [
+        "project",
+        "gameVersion",
+        "loader"
+      ]
+    },
+    "INVALID_FILE_NAME": {
+      "args": [
+        "name"
+      ]
     }
   }
 }

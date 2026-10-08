@@ -2,6 +2,7 @@ import SwiftUI
 
 struct EmptyStateView: View {
     @Binding var showingNew: Bool
+    @Binding var importing: Bool
 
     var body: some View {
         VStack(spacing: Bark.Space.lg) {
@@ -17,12 +18,13 @@ struct EmptyStateView: View {
             HStack(spacing: Bark.Space.md) {
                 Button(L("instances.new")) { showingNew = true }
                     .buttonStyle(.borderedProminent)
-                Button(L("empty.import")) {}
-                    .disabled(true)
-                    .help(L("empty.comingSoon"))
+                Button(L("empty.import")) { importing = true }
             }
             .controlSize(.large)
             .padding(.top, Bark.Space.sm)
+            Text(L("import.drop"))
+                .font(.caption)
+                .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

@@ -39,20 +39,55 @@ pub struct VersionSummary {
     pub release_time: String,
 }
 
+/// A version JSON. Mod loader profiles only fill part of it and name a parent in `inherits_from`.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VersionJson {
     pub id: String,
-    #[serde(rename = "type")]
+    #[serde(rename = "type", default)]
     pub kind: String,
     pub main_class: String,
-    pub assets: String,
-    pub asset_index: FileRef,
-    pub downloads: Downloads,
+    pub asset_index: Option<FileRef>,
+    pub downloads: Option<Downloads>,
+    #[serde(default)]
     pub libraries: Vec<Library>,
     pub arguments: Option<Arguments>,
     pub minecraft_arguments: Option<String>,
     pub java_version: Option<JavaVersion>,
+    pub inherits_from: Option<String>,
+}
+
+impl VersionJson {
+    /// Apply a loader profile on top of its parent: the child's main class and arguments win,
+    /// libraries are combined with the child's first, everything else comes from the parent.
+    pub fn merge(parent: Self, child: Self) -> Self {
+        let mut libraries = child.libraries;
+        libraries.extend(parent.libraries);
+        let arguments = match (parent.arguments, child.arguments) {
+            (Some(mut base), Some(extra)) => {
+                base.game.extend(extra.game);
+                base.jvm.extend(extra.jvm);
+                Some(base)
+            }
+            (base, extra) => extra.or(base),
+        };
+        Self {
+            id: child.id,
+            kind: if child.kind.is_empty() {
+                parent.kind
+            } else {
+                child.kind
+            },
+            main_class: child.main_class,
+            asset_index: child.asset_index.or(parent.asset_index),
+            downloads: child.downloads.or(parent.downloads),
+            libraries,
+            arguments,
+            minecraft_arguments: child.minecraft_arguments.or(parent.minecraft_arguments),
+            java_version: child.java_version.or(parent.java_version),
+            inherits_from: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -84,6 +119,13 @@ pub struct Library {
     pub name: String,
     #[serde(default)]
     pub downloads: Option<LibraryDownloads>,
+    /// Maven repository base, used by loader profiles instead of `downloads`.
+    #[serde(default)]
+    pub url: Option<String>,
+    #[serde(default)]
+    pub sha1: Option<String>,
+    #[serde(default)]
+    pub size: Option<u64>,
     #[serde(default)]
     pub rules: Vec<Rule>,
     #[serde(default)]

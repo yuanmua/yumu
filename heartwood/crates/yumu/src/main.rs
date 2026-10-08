@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -5,7 +6,7 @@ use anyhow::Context;
 use clap::{Parser, Subcommand};
 use heartwood::download::{Downloader, Progress};
 use heartwood::instance::{Store, slug};
-use heartwood::{Error, account, install, launch, mojang};
+use heartwood::{Error, account, install, launch, modpack, mods, mojang};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -29,6 +30,9 @@ enum Command {
         /// Instance name, defaults to the version
         #[arg(long)]
         name: Option<String>,
+        /// Mod loader for a new instance: vanilla, fabric or quilt
+        #[arg(long, default_value = "vanilla")]
+        loader: String,
         /// Offline player name
         #[arg(long, default_value = "Player")]
         player: String,
@@ -46,6 +50,36 @@ enum Command {
         /// Include snapshots
         #[arg(long)]
         snapshots: bool,
+    },
+    /// Manage mods of an instance
+    Mod {
+        #[command(subcommand)]
+        command: ModCommand,
+    },
+    /// Import modpacks
+    Modpack {
+        #[command(subcommand)]
+        command: ModpackCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum ModCommand {
+    /// List installed mods
+    List { instance: String },
+    /// Search Modrinth for mods compatible with the instance
+    Search { instance: String, query: String },
+    /// Install a Modrinth project (by id or slug) and its required dependencies
+    Install { instance: String, project: String },
+}
+
+#[derive(Subcommand)]
+enum ModpackCommand {
+    /// Create an instance from a .mrpack file
+    Import {
+        path: PathBuf,
+        #[arg(long)]
+        name: Option<String>,
     },
 }
 
@@ -78,9 +112,10 @@ async fn main() -> anyhow::Result<()> {
         Command::Play {
             version,
             name,
+            loader,
             player,
             detach,
-        } => play(&store, &downloader, version, name, &player, detach).await,
+        } => play(&store, &downloader, version, name, &loader, &player, detach).await,
         Command::Instance {
             command: InstanceCommand::List,
         } => {
@@ -100,6 +135,82 @@ async fn main() -> anyhow::Result<()> {
             }
             Ok(())
         }
+        Command::Mod { command } => run_mod(&store, &downloader, command).await,
+        Command::Modpack {
+            command: ModpackCommand::Import { path, name },
+        } => {
+            let progress = Arc::new(Progress::default());
+            let reporter = tokio::spawn(report(Arc::clone(&progress)));
+            let result =
+                modpack::import(&store, &downloader, &path, name.as_deref(), &progress).await;
+            reporter.abort();
+            println!();
+            println!("Imported as instance {}", result?);
+            Ok(())
+        }
+    }
+}
+
+async fn run_mod(
+    store: &Store,
+    downloader: &Downloader,
+    command: ModCommand,
+) -> anyhow::Result<()> {
+    match command {
+        ModCommand::List { instance } => {
+            let id = slug(&instance);
+            for m in mods::list(&store.game_dir(&id), &store.cache_dir()).await? {
+                let state = if m.enabled { "on" } else { "off" };
+                let source = m
+                    .record
+                    .map_or(String::new(), |r| format!("modrinth:{}", r.project_id));
+                println!(
+                    "{state}\t{}\t{}\t{}\t{source}",
+                    m.name, m.version, m.file_name
+                );
+            }
+            Ok(())
+        }
+        ModCommand::Search { instance, query } => {
+            let target = store.load(&slug(&instance)).await?;
+            let result = mods::search(
+                downloader,
+                &query,
+                &target.game.version,
+                &target.loader.kind,
+                0,
+            )
+            .await?;
+            for hit in result.hits {
+                println!(
+                    "{}\t{}\t{}\t{}",
+                    hit.slug, hit.title, hit.downloads, hit.description
+                );
+            }
+            Ok(())
+        }
+        ModCommand::Install { instance, project } => {
+            let id = slug(&instance);
+            let target = store.load(&id).await?;
+            let progress = Arc::new(Progress::default());
+            let reporter = tokio::spawn(report(Arc::clone(&progress)));
+            let result = mods::install(
+                downloader,
+                &store.game_dir(&id),
+                &store.cache_dir(),
+                &project,
+                &target.game.version,
+                &target.loader.kind,
+                &progress,
+            )
+            .await;
+            reporter.abort();
+            println!();
+            for record in result? {
+                println!("Installed {} {}", record.title, record.version_number);
+            }
+            Ok(())
+        }
     }
 }
 
@@ -108,6 +219,7 @@ async fn play(
     downloader: &Downloader,
     version: Option<String>,
     name: Option<String>,
+    loader: &str,
     player: &str,
     detach: bool,
 ) -> anyhow::Result<()> {
@@ -124,7 +236,12 @@ async fn play(
         Err(Error::InstanceNotFound(_)) => {
             let version = resolve_version(downloader, version).await?;
             store.create(&name, &version).await?;
-            store.load(&id).await?
+            let mut created = store.load(&id).await?;
+            if loader != heartwood::loader::VANILLA {
+                created.loader.kind = loader.to_owned();
+                store.save(&id, &created).await?;
+            }
+            created
         }
         Err(error) => return Err(error.into()),
     };
@@ -132,7 +249,7 @@ async fn play(
 
     let progress = Arc::new(Progress::default());
     let reporter = tokio::spawn(report(Arc::clone(&progress)));
-    let prepared = install::install(store, downloader, &instance, &progress).await;
+    let prepared = install::install(store, downloader, &id, &mut instance, &progress).await;
     reporter.abort();
     println!();
     let prepared = prepared.context("installation failed")?;

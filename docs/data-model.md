@@ -28,7 +28,8 @@ Yumu/
     ├── assets/indexes/ objects/
     ├── natives/<version-id>/  解压后的 natives
     ├── java/<component>/      Mojang 运行时
-    └── meta/                  版本清单等远程 JSON 的缓存
+    └── meta/
+        └── modrinth-index.json  sha1 → Modrinth 项目与版本，记录 Yumu 自己装过的模组
 ```
 
 原则：`instances/` 是用户数据，`cache/` 是可再生数据，绝不混放。
@@ -72,7 +73,7 @@ height = 720
 
 ## 4. Mod 列表是派生数据
 
-不单独存文件，扫描 `.minecraft/mods/` 得到，元数据从缓存补全。用户手动拖 jar 进目录是常见行为，派生数据不会与目录不一致。禁用方式是加 `.disabled` 后缀，与 Prism、Modrinth App 兼容。
+不单独存文件，扫描 `.minecraft/mods/` 得到：名称与版本读 jar 内的 `fabric.mod.json`、`quilt.mod.json` 或 `META-INF/*mods.toml`，来源信息按 sha1 从 `cache/meta/modrinth-index.json` 补全。用户手动拖 jar 进目录是常见行为，派生数据不会与目录不一致。禁用方式是加 `.disabled` 后缀，与 Prism、Modrinth App 兼容。
 
 ## 5. settings.toml
 

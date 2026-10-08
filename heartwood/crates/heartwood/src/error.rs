@@ -45,6 +45,16 @@ pub enum Error {
     JavaUnavailable { component: String },
     #[error("{0} is not supported")]
     Unsupported(&'static str),
+    #[error("downloads from {url} are not allowed")]
+    HostNotAllowed { url: String },
+    #[error("no version of {project} works with {game_version} on {loader}")]
+    ModNotCompatible {
+        project: String,
+        game_version: String,
+        loader: String,
+    },
+    #[error("invalid file name {0}")]
+    InvalidFileName(String),
     #[error("entry {0} escapes its target directory")]
     PathTraversal(String),
     #[error("zip error: {0}")]
@@ -80,6 +90,9 @@ impl Error {
             Self::EditionUnsupported(_) => "INSTANCE_EDITION_UNSUPPORTED",
             Self::JavaUnavailable { .. } => "JAVA_UNAVAILABLE",
             Self::Unsupported(_) => "UNSUPPORTED",
+            Self::HostNotAllowed { .. } => "DOWNLOAD_HOST_NOT_ALLOWED",
+            Self::ModNotCompatible { .. } => "MOD_NOT_COMPATIBLE",
+            Self::InvalidFileName(_) => "INVALID_FILE_NAME",
             Self::PathTraversal(_) => "PATH_TRAVERSAL",
             Self::Zip(_) => "ZIP",
             Self::Join(_) | Self::Cancelled => "CANCELLED",

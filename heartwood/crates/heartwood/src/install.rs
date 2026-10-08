@@ -1,4 +1,4 @@
-//! Bring an instance to a launchable state: version JSON, Java, libraries, client jar, assets, natives.
+//! Bring an instance to a launchable state: version JSON, loader profile, Java, libraries, client jar, assets, natives.
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -12,11 +12,12 @@ use crate::mojang::{
 };
 use crate::mojang::{VERSION_MANIFEST_URL, fetch_manifest};
 use crate::rules::{Features, allows};
-use crate::{java, platform};
+use crate::{java, loader, platform};
 
 /// Everything `launch` needs, all present on disk.
 pub struct Prepared {
     pub version: VersionJson,
+    pub asset_index_id: String,
     pub java: PathBuf,
     pub classpath: Vec<PathBuf>,
     pub natives_dir: PathBuf,
@@ -27,15 +28,24 @@ pub struct Prepared {
 pub async fn install(
     store: &Store,
     downloader: &Downloader,
-    instance: &Instance,
+    id: &str,
+    instance: &mut Instance,
     progress: &Arc<Progress>,
 ) -> Result<Prepared> {
     let cache = store.cache_dir();
-    let version_id = &instance.game.version;
-    let version_dir = cache.join("versions").join(version_id);
-    let version_file = version_dir.join(format!("{version_id}.json"));
-    fetch_version_json(downloader, version_id, &version_file).await?;
-    let version: VersionJson = read_json(&version_file).await?;
+    let game_version = instance.game.version.clone();
+    let version = resolve_version(store, downloader, id, instance, &cache).await?;
+    let asset_index = version
+        .asset_index
+        .clone()
+        .ok_or_else(|| Error::Malformed(format!("version {} has no asset index", version.id)))?;
+    let client = version
+        .downloads
+        .as_ref()
+        .map(|downloads| downloads.client.clone())
+        .ok_or_else(|| {
+            Error::Malformed(format!("version {} has no client download", version.id))
+        })?;
 
     let component = version
         .java_version
@@ -51,17 +61,23 @@ pub async fn install(
         if !allows(&library.rules, Features::default()) {
             continue;
         }
-        let Some(library_downloads) = &library.downloads else {
-            tracing::debug!(name = %library.name, "library without downloads skipped");
-            continue;
-        };
-        if let Some(artifact) = &library_downloads.artifact {
-            let path = libraries_dir.join(relative_path(artifact, &library.name)?);
+        if let Some(artifact) = library_artifact(library)? {
+            let path = libraries_dir.join(&artifact.path);
             classpath.push(path.clone());
-            downloads.push(download(artifact, path, progress));
+            progress.add_total(artifact.size.unwrap_or(0));
+            downloads.push(Download {
+                url: artifact.url,
+                path,
+                sha1: artifact.sha1,
+                size: artifact.size,
+                executable: false,
+            });
         }
         if let Some(classifier) = native_classifier(library)
-            && let Some(artifact) = library_downloads.classifiers.get(&classifier)
+            && let Some(artifact) = library
+                .downloads
+                .as_ref()
+                .and_then(|downloads| downloads.classifiers.get(&classifier))
         {
             let name = format!("{}:{classifier}", library.name);
             let path = libraries_dir.join(relative_path(artifact, &name)?);
@@ -75,21 +91,59 @@ pub async fn install(
         }
     }
 
-    let client_jar = version_dir.join(format!("{version_id}.jar"));
-    downloads.push(download(
-        &version.downloads.client,
-        client_jar.clone(),
-        progress,
-    ));
+    let client_jar = cache
+        .join("versions")
+        .join(&game_version)
+        .join(format!("{game_version}.jar"));
+    downloads.push(download(&client, client_jar.clone(), progress));
     classpath.push(client_jar);
 
     let assets_dir = cache.join("assets");
+    collect_assets(
+        downloader,
+        &assets_dir,
+        &asset_index,
+        &mut downloads,
+        progress,
+    )
+    .await?;
+
+    downloader.fetch_all(downloads, progress).await?;
+
+    let natives_dir = cache.join("natives").join(&version.id);
+    tokio::fs::create_dir_all(&natives_dir)
+        .await
+        .map_err(io(&natives_dir))?;
+    for (jar, exclude) in natives {
+        let dest = natives_dir.clone();
+        tokio::task::spawn_blocking(move || extract(&jar, &dest, &exclude)).await??;
+    }
+
+    Ok(Prepared {
+        version,
+        asset_index_id: asset_index.id,
+        java,
+        classpath,
+        natives_dir,
+        assets_dir,
+        libraries_dir,
+    })
+}
+
+/// Download the asset index and queue every object it lists that is not yet in the cache.
+async fn collect_assets(
+    downloader: &Downloader,
+    assets_dir: &Path,
+    asset_index: &FileRef,
+    downloads: &mut Vec<Download>,
+    progress: &Arc<Progress>,
+) -> Result<()> {
     let index_file = assets_dir
         .join("indexes")
-        .join(format!("{}.json", version.asset_index.id));
+        .join(format!("{}.json", asset_index.id));
     downloader
         .fetch(
-            &download(&version.asset_index, index_file.clone(), progress),
+            &download(asset_index, index_file.clone(), progress),
             progress,
         )
         .await?;
@@ -115,26 +169,47 @@ pub async fn install(
             executable: false,
         });
     }
+    Ok(())
+}
 
-    downloader.fetch_all(downloads, progress).await?;
+/// The fully merged version JSON for an instance: vanilla, or a loader profile on top of vanilla.
+async fn resolve_version(
+    store: &Store,
+    downloader: &Downloader,
+    id: &str,
+    instance: &mut Instance,
+    cache: &Path,
+) -> Result<VersionJson> {
+    let game_version = instance.game.version.clone();
+    let vanilla_file = cache
+        .join("versions")
+        .join(&game_version)
+        .join(format!("{game_version}.json"));
+    fetch_version_json(downloader, &game_version, &vanilla_file).await?;
+    let vanilla: VersionJson = read_json(&vanilla_file).await?;
 
-    let natives_dir = cache.join("natives").join(version_id);
-    tokio::fs::create_dir_all(&natives_dir)
-        .await
-        .map_err(io(&natives_dir))?;
-    for (jar, exclude) in natives {
-        let dest = natives_dir.clone();
-        tokio::task::spawn_blocking(move || extract(&jar, &dest, &exclude)).await??;
+    let kind = instance.loader.kind.clone();
+    if kind == loader::VANILLA {
+        return Ok(vanilla);
     }
-
-    Ok(Prepared {
-        version,
-        java,
-        classpath,
-        natives_dir,
-        assets_dir,
-        libraries_dir,
-    })
+    if !loader::is_supported(&kind) {
+        return Err(Error::Unsupported("this mod loader"));
+    }
+    if instance.loader.version.is_empty() {
+        // Pin the loader version the first time so the instance stays reproducible.
+        instance.loader.version = loader::latest(downloader, &kind, &game_version).await?;
+        store.save(id, instance).await?;
+    }
+    let profile_file = loader::ensure_profile(
+        downloader,
+        cache,
+        &kind,
+        &instance.loader.version,
+        &game_version,
+    )
+    .await?;
+    let profile: VersionJson = read_json(&profile_file).await?;
+    Ok(VersionJson::merge(vanilla, profile))
 }
 
 /// Fetch the version JSON by its manifest entry, falling back to a cached copy when offline.
@@ -164,7 +239,7 @@ async fn fetch_version_json(downloader: &Downloader, version_id: &str, file: &Pa
     }
 }
 
-async fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T> {
+pub(crate) async fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T> {
     let text = tokio::fs::read_to_string(path).await.map_err(io(path))?;
     serde_json::from_str(&text).map_err(|source| Error::Json {
         from: path.display().to_string(),
@@ -181,6 +256,37 @@ fn download(file: &FileRef, path: PathBuf, progress: &Progress) -> Download {
         size: Some(file.size),
         executable: false,
     }
+}
+
+struct Artifact {
+    path: String,
+    url: String,
+    sha1: Option<String>,
+    size: Option<u64>,
+}
+
+/// Where a library's main jar lives: Mojang gives explicit downloads, loaders give a Maven base URL.
+fn library_artifact(library: &Library) -> Result<Option<Artifact>> {
+    if let Some(artifact) = library.downloads.as_ref().and_then(|d| d.artifact.as_ref()) {
+        return Ok(Some(Artifact {
+            path: relative_path(artifact, &library.name)?,
+            url: artifact.url.clone(),
+            sha1: Some(artifact.sha1.clone()),
+            size: Some(artifact.size),
+        }));
+    }
+    let Some(base) = &library.url else {
+        tracing::debug!(name = %library.name, "library without downloads skipped");
+        return Ok(None);
+    };
+    let path = maven_path(&library.name)
+        .ok_or_else(|| Error::Malformed(format!("library name {}", library.name)))?;
+    Ok(Some(Artifact {
+        url: format!("{}/{path}", base.trim_end_matches('/')),
+        path,
+        sha1: library.sha1.clone(),
+        size: library.size,
+    }))
 }
 
 fn relative_path(file: &FileRef, name: &str) -> Result<String> {
@@ -202,21 +308,40 @@ fn native_classifier(library: &Library) -> Option<String> {
         .map(|classifier| classifier.replace("${arch}", "64"))
 }
 
-fn extract(jar: &Path, dest: &Path, exclude: &[String]) -> Result<()> {
-    let file = std::fs::File::open(jar).map_err(io(jar))?;
-    let mut archive = zip::ZipArchive::new(file)?;
-    for index in 0..archive.len() {
-        let mut entry = archive.by_index(index)?;
+/// Extract a zip into `dest`, skipping `exclude` prefixes and refusing entries that escape.
+pub(crate) fn extract(archive: &Path, dest: &Path, exclude: &[String]) -> Result<()> {
+    extract_prefix(archive, dest, "", exclude)
+}
+
+/// Like `extract`, but only entries under `prefix`, with the prefix removed.
+pub(crate) fn extract_prefix(
+    archive: &Path,
+    dest: &Path,
+    prefix: &str,
+    exclude: &[String],
+) -> Result<()> {
+    let file = std::fs::File::open(archive).map_err(io(archive))?;
+    let mut zip = zip::ZipArchive::new(file)?;
+    for index in 0..zip.len() {
+        let mut entry = zip.by_index(index)?;
         let name = entry.name().to_owned();
-        if exclude
-            .iter()
-            .any(|prefix| name.starts_with(prefix.as_str()))
+        let Some(stripped) = name.strip_prefix(prefix) else {
+            continue;
+        };
+        if stripped.is_empty()
+            || exclude
+                .iter()
+                .any(|skip| stripped.starts_with(skip.as_str()))
         {
             continue;
         }
         let Some(relative) = entry.enclosed_name() else {
             return Err(Error::PathTraversal(name));
         };
+        let relative: PathBuf = relative
+            .components()
+            .skip(prefix.matches('/').count())
+            .collect();
         let target = dest.join(relative);
         if entry.is_dir() {
             std::fs::create_dir_all(&target).map_err(io(&target))?;

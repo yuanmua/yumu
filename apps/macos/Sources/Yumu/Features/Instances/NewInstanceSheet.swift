@@ -5,6 +5,8 @@ struct NewInstanceSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var version = ""
+    @State private var loader = "vanilla"
+    private static let loaders = ["vanilla", "fabric", "quilt"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: Bark.Space.lg) {
@@ -27,6 +29,10 @@ struct NewInstanceSheet: View {
                         Text(L("new.loadingVersions")).foregroundStyle(.secondary)
                     }
                 }
+                Picker(L("new.loader"), selection: $loader) {
+                    ForEach(Self.loaders, id: \.self) { Text(L("loader.\($0)")).tag($0) }
+                }
+                .pickerStyle(.segmented)
             }
             .formStyle(.grouped)
             HStack {
@@ -34,7 +40,7 @@ struct NewInstanceSheet: View {
                 Button(L("common.cancel"), role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
                 Button(L("new.create")) {
-                    model.createInstance(name: name.isEmpty ? version : name, version: version)
+                    model.createInstance(name: name.isEmpty ? version : name, version: version, loader: loader)
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)

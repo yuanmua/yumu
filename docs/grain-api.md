@@ -40,17 +40,23 @@ const char* grain_api_version(void);                    // 接口版本，semver
 | 命名空间 | 方法 | 同步/异步 | 状态 |
 |---|---|---|---|
 | `grain` | `ping` | 同步 | 已实现 |
-| `instance` | `list`、`create`、`delete` | 同步 | 已实现 |
-| `instance` | `launch`（补齐缺失文件后启动，结果 `{pid}`） | 异步 | 已实现 |
-| `version` | `listGame`（结果 `{latestRelease, versions:[{id,kind,releaseTime}]}`） | 异步 | 已实现 |
+| `instance` | `list`、`create {name, gameVersion, loaderKind?, loaderVersion?}`、`delete {id}` | 同步 | 已实现 |
+| `instance` | `launch {id, playerName}`：补齐缺失文件后启动，结果 `{pid}` | 异步 | 已实现 |
+| `version` | `listGame {snapshots?}` → `{latestRelease, versions:[{id,kind,releaseTime}]}` | 异步 | 已实现 |
+| `version` | `listLoader {gameVersion, loader}` → `[{version, stable}]` | 异步 | 已实现 |
+| `mod` | `listInstalled {id}` → `[LocalMod]`、`toggle {id, fileName, enabled}`、`remove {id, fileName}` | 同步 | 已实现 |
+| `mod` | `search {id, query, offset?}` → `{hits:[SearchHit], totalHits}`；`install {id, projectId}` → `[ModRecord]`（含自动装上的依赖） | 异步 | 已实现 |
+| `resource` | `list {id, kind}` → `[{fileName, enabled, size}]`、`add {id, kind, path}`、`remove`、`toggle`；`kind` 为 `shaderpacks` 或 `resourcepacks` | 同步 | 已实现 |
+| `modpack` | `inspect {path}` → `{name, version, gameVersion, loaderKind, loaderVersion, fileCount}` | 同步 | 已实现 |
+| `modpack` | `import {path, name?}` → `{id}`，目前支持 `.mrpack` | 异步 | 已实现 |
 | `instance` | `get`、`update`、`duplicate` | 同步 | 计划 |
 | `account` | `list`、`addOffline`、`remove`、`setActive`、`beginMicrosoftLogin` | 同步 / 异步 | 阶段 2 |
 | `discover` | `scan` | 异步 | 阶段 2 |
-| `mod`、`resource`、`modpack` | | | 阶段 4 |
 | `settings` | `get`、`update` | 同步 | 计划 |
 
-`instance.list` 返回 `[{id, name, gameVersion, loaderKind, lastPlayedAt, playtimeSeconds, running}]`。
-`instance.create` 参数 `{name, gameVersion}`，返回 `{id}`。`instance.launch` 参数 `{id, playerName}`。
+`instance.list` 返回 `[{id, name, gameVersion, loaderKind, loaderVersion, lastPlayedAt, playtimeSeconds, running}]`。
+`LocalMod` 是 `{fileName, enabled, size, name, version, record?}`，`record` 为 `{projectId, versionId, title, versionNumber}`，只有 Yumu 自己装的模组才有。
+`SearchHit` 是 `{projectId, slug, title, description, iconUrl?, downloads, author}`。
 
 同步方法在调用线程上执行，只允许毫秒级操作；凡是会碰网络或长时间磁盘 IO 的方法都是异步方法。用 `grain_start` 调同步方法、或用 `grain_call` 调异步方法，都返回 `INVALID_REQUEST`。
 

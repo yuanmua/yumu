@@ -16,6 +16,11 @@ cd heartwood
 cargo build
 cargo run -p yumu -- play            # 最新正式版，离线账号，装好就启动
 cargo run -p yumu -- play --version 1.21.1 --name 生存 --player Steve
+cargo run -p yumu -- play --version 1.21.1 --name 模组 --loader fabric
+cargo run -p yumu -- mod search 模组 sodium
+cargo run -p yumu -- mod install 模组 sodium-extra   # 会一并装上依赖 sodium
+cargo run -p yumu -- mod list 模组
+cargo run -p yumu -- modpack import ~/Downloads/pack.mrpack
 cargo run -p yumu -- instance list
 cargo run -p yumu -- version list
 ```

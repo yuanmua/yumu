@@ -28,11 +28,17 @@
 - [ ] 崩溃报告分类展示。
 - [ ] 签名、公证、Sparkle 更新。
 
-## 阶段 4：Mod 与整合包
+## 阶段 4：Mod 与整合包（进行中）
 
-- Fabric、Quilt 安装；Modrinth 搜索与安装；`.mrpack` 导入。
-- Forge、NeoForge；CurseForge（需要 API key）。
-- 光影、资源包管理。
+- [x] Fabric、Quilt 加载器：meta 服务器取 profile，版本 JSON 继承合并，首次安装时固定加载器版本。
+- [x] Modrinth 搜索、安装、必需依赖自动解析；本地模组列表读取 jar 元数据；启用、禁用、移除。
+- [x] `.mrpack` 导入：下载源白名单、路径穿越防护、overrides 解压、失败自动回滚实例。
+- [x] 光影包与资源包的添加、启用、禁用、移除。
+- [x] 界面：模组页（已安装 + 搜索安装）、资源页、新建实例选加载器、拖入 `.mrpack` 或按钮导入。
+- [ ] Forge、NeoForge（需要在核心内运行安装器处理器）。
+- [ ] CurseForge（需要 API key；禁止分发的文件跳转浏览器）。
+- [ ] 模组更新检测、按哈希识别用户手动放入的模组。
+- [ ] 整合包导出为 `.mrpack`。
 
 ## 阶段 5：Windows
 

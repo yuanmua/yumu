@@ -83,16 +83,34 @@ impl Downloader {
     }
 
     pub async fn get_json<T: DeserializeOwned>(&self, url: &str) -> Result<T> {
-        let body = retry(|| self.get_text(url)).await?;
+        let body = self.get_text(url).await?;
         serde_json::from_str(&body).map_err(|source| Error::Json {
             from: url.to_owned(),
             source,
         })
     }
 
-    async fn get_text(&self, url: &str) -> Result<String> {
-        let response = self.client.get(url).send().await.map_err(http(url))?;
-        check_status(response, url)?.text().await.map_err(http(url))
+    pub async fn get_text(&self, url: &str) -> Result<String> {
+        retry(|| async {
+            let response = self.client.get(url).send().await.map_err(http(url))?;
+            check_status(response, url)?.text().await.map_err(http(url))
+        })
+        .await
+    }
+
+    /// Reject a download URL whose host is not in `allowed`. Keeps us inside each platform's terms.
+    pub fn check_host(url: &str, allowed: &[&str]) -> Result<()> {
+        let host = reqwest::Url::parse(url)
+            .ok()
+            .and_then(|parsed| parsed.host_str().map(str::to_owned))
+            .ok_or_else(|| Error::Malformed(format!("url {url}")))?;
+        if allowed.contains(&host.as_str()) {
+            Ok(())
+        } else {
+            Err(Error::HostNotAllowed {
+                url: url.to_owned(),
+            })
+        }
     }
 
     /// Download one file unless an identical copy already exists.

@@ -59,7 +59,7 @@ pub async fn launch(
         ("game_directory", game_dir.display().to_string()),
         ("assets_root", assets.clone()),
         ("game_assets", assets),
-        ("assets_index_name", version.asset_index.id.clone()),
+        ("assets_index_name", prepared.asset_index_id.clone()),
         ("resolution_width", instance.window.width.to_string()),
         ("resolution_height", instance.window.height.to_string()),
         ("natives_directory", natives.clone()),

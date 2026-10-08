@@ -1,8 +1,16 @@
+import AppKit
 import SwiftUI
+
+private enum DetailTab: String, CaseIterable {
+    case overview, mods, resources
+
+    var titleKey: String { "detail.tab.\(rawValue)" }
+}
 
 struct InstanceDetailView: View {
     @Environment(AppModel.self) private var model
     let instance: InstanceSummary
+    @State private var tab = DetailTab.overview
     // Stop-gap until account.* lands: offline name is a pure interface preference for now.
     @AppStorage("offlinePlayerName") private var playerName = "Player"
 
@@ -11,29 +19,24 @@ struct InstanceDetailView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Bark.Space.xl) {
             header
-            stats
-            Spacer()
-            TextField(L("detail.playerName"), text: $playerName)
-                .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: 240)
-            HStack(alignment: .bottom) {
-                status
-                Spacer()
-                Button {
-                    model.play(instance.id, playerName: playerName)
-                } label: {
-                    Label(L("detail.play"), systemImage: "play.fill")
-                        .frame(minWidth: 120)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.extraLarge)
-                .disabled(activity != nil || playerName.trimmingCharacters(in: .whitespaces).isEmpty)
+            Picker("", selection: $tab) {
+                ForEach(DetailTab.allCases, id: \.self) { Text(L($0.titleKey)).tag($0) }
             }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(maxWidth: 360)
+            switch tab {
+            case .overview: OverviewTab(instance: instance)
+            case .mods: ModsView(instance: instance)
+            case .resources: ResourcesView(instance: instance)
+            }
+            footer
         }
         .padding(Bark.Space.xxl)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .barkAnimation(Bark.Motion.standard, value: activity)
         .navigationTitle(instance.name)
+        .onChange(of: instance.id) { tab = .overview }
     }
 
     private var header: some View {
@@ -42,32 +45,42 @@ struct InstanceDetailView: View {
                 .fill(.tint.opacity(0.15))
                 .frame(width: 72, height: 72)
                 .overlay {
-                    Image(systemName: "cube.fill")
+                    Image(systemName: instance.isVanilla ? "cube.fill" : "puzzlepiece.extension.fill")
                         .font(.system(size: 32))
                         .foregroundStyle(.tint)
                 }
             VStack(alignment: .leading, spacing: Bark.Space.xs) {
                 Text(instance.name)
                     .font(.largeTitle.weight(.semibold))
-                Text("\(loaderName) · \(instance.gameVersion)")
+                Text(subtitle)
                     .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button {
+                NSWorkspace.shared.open(gameDirectory)
+            } label: {
+                Label(L("detail.openFolder"), systemImage: "folder")
             }
         }
     }
 
-    private var stats: some View {
-        Grid(alignment: .leading, horizontalSpacing: Bark.Space.xl, verticalSpacing: Bark.Space.sm) {
-            GridRow {
-                Text(L("detail.lastPlayed")).foregroundStyle(.secondary)
-                Text(lastPlayed)
+    private var footer: some View {
+        HStack(alignment: .bottom) {
+            status
+            Spacer()
+            TextField(L("detail.playerName"), text: $playerName)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 160)
+            Button {
+                model.play(instance.id, playerName: playerName)
+            } label: {
+                Label(L("detail.play"), systemImage: "play.fill")
+                    .frame(minWidth: 120)
             }
-            GridRow {
-                Text(L("detail.playtime")).foregroundStyle(.secondary)
-                Text(Duration.seconds(Int64(instance.playtimeSeconds))
-                    .formatted(.units(allowed: [.hours, .minutes], width: .abbreviated)))
-            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.extraLarge)
+            .disabled(activity != nil || playerName.trimmingCharacters(in: .whitespaces).isEmpty)
         }
-        .font(.callout)
     }
 
     @ViewBuilder
@@ -95,17 +108,44 @@ struct InstanceDetailView: View {
         }
     }
 
-    private var loaderName: String {
-        instance.loaderKind == "vanilla" ? L("detail.vanilla") : instance.loaderKind.capitalized
+    private var subtitle: String {
+        let loader = instance.isVanilla ? L("detail.vanilla") : L("loader.\(instance.loaderKind)")
+        let version = instance.loaderVersion.isEmpty ? "" : " \(instance.loaderVersion)"
+        return "\(loader)\(version) · \(instance.gameVersion)"
+    }
+
+    private var gameDirectory: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return base.appending(path: "Yumu/instances/\(instance.id)/.minecraft")
+    }
+
+    private func bytes(_ count: UInt64) -> String {
+        ByteCountFormatter.string(fromByteCount: Int64(count), countStyle: .file)
+    }
+}
+
+private struct OverviewTab: View {
+    let instance: InstanceSummary
+
+    var body: some View {
+        Grid(alignment: .leading, horizontalSpacing: Bark.Space.xl, verticalSpacing: Bark.Space.sm) {
+            GridRow {
+                Text(L("detail.lastPlayed")).foregroundStyle(.secondary)
+                Text(lastPlayed)
+            }
+            GridRow {
+                Text(L("detail.playtime")).foregroundStyle(.secondary)
+                Text(Duration.seconds(Int64(instance.playtimeSeconds))
+                    .formatted(.units(allowed: [.hours, .minutes], width: .abbreviated)))
+            }
+        }
+        .font(.callout)
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     private var lastPlayed: String {
         guard instance.lastPlayedAt > 0 else { return L("detail.never") }
         return Date(timeIntervalSince1970: TimeInterval(instance.lastPlayedAt))
             .formatted(.relative(presentation: .named))
-    }
-
-    private func bytes(_ count: UInt64) -> String {
-        ByteCountFormatter.string(fromByteCount: Int64(count), countStyle: .file)
     }
 }

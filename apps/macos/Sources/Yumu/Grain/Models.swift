@@ -5,9 +5,12 @@ struct InstanceSummary: Codable, Identifiable, Hashable, Sendable {
     let name: String
     let gameVersion: String
     let loaderKind: String
+    let loaderVersion: String
     let lastPlayedAt: UInt64
     let playtimeSeconds: UInt64
     let running: Bool
+
+    var isVanilla: Bool { loaderKind == "vanilla" }
 }
 
 struct GameVersion: Codable, Identifiable, Hashable, Sendable {
@@ -21,11 +24,74 @@ struct VersionList: Codable, Hashable, Sendable {
     let versions: [GameVersion]
 }
 
+struct ModRecord: Codable, Hashable, Sendable {
+    let projectId: String
+    let versionId: String
+    let title: String
+    let versionNumber: String
+}
+
+struct LocalMod: Codable, Identifiable, Hashable, Sendable {
+    let fileName: String
+    let enabled: Bool
+    let size: UInt64
+    let name: String
+    let version: String
+    let record: ModRecord?
+
+    var id: String { fileName }
+    var displayName: String { record?.title ?? name }
+}
+
+struct SearchHit: Codable, Identifiable, Hashable, Sendable {
+    let projectId: String
+    let slug: String
+    let title: String
+    let description: String
+    let iconUrl: String?
+    let downloads: UInt64
+    let author: String
+
+    var id: String { projectId }
+}
+
+struct SearchResult: Codable, Hashable, Sendable {
+    let hits: [SearchHit]
+    let totalHits: UInt64
+}
+
+struct ResourceFile: Codable, Identifiable, Hashable, Sendable {
+    let fileName: String
+    let enabled: Bool
+    let size: UInt64
+
+    var id: String { fileName }
+}
+
+enum ResourceKind: String, CaseIterable, Sendable {
+    case shaderpacks, resourcepacks
+
+    var titleKey: String {
+        self == .shaderpacks ? "resources.shaders" : "resources.resourcePacks"
+    }
+}
+
 struct Empty: Codable, Sendable {}
 struct IdParams: Codable, Sendable { let id: String }
-struct CreateParams: Encodable, Sendable { let name: String; let gameVersion: String }
+struct CreateParams: Encodable, Sendable { let name: String; let gameVersion: String; let loaderKind: String }
 struct LaunchParams: Encodable, Sendable { let id: String; let playerName: String }
 struct VersionParams: Encodable, Sendable { let snapshots: Bool }
+struct SearchParams: Encodable, Sendable { let id: String; let query: String; let offset: UInt32 }
+struct ModInstallParams: Encodable, Sendable { let id: String; let projectId: String }
+struct FileParams: Encodable, Sendable { let id: String; let fileName: String; let enabled: Bool }
+struct ResourceParams: Encodable, Sendable {
+    let id: String
+    let kind: String
+    var fileName: String = ""
+    var enabled: Bool = false
+    var path: String = ""
+}
+struct PackParams: Encodable, Sendable { let path: String }
 
 struct Envelope<P: Decodable & Sendable>: Decodable, Sendable { let topic: String; let payload: P }
 struct TaskRef: Decodable, Sendable { let taskId: String }
