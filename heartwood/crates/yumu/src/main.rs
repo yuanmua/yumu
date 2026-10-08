@@ -162,7 +162,13 @@ async fn main() -> anyhow::Result<()> {
             for installation in &scan.installations {
                 println!("{}\t{}", installation.launcher, installation.path.display());
                 for version in &installation.versions {
-                    println!("  version\t{version}");
+                    println!(
+                        "  version\t{}\t{} {} {}",
+                        version.id,
+                        version.game_version,
+                        version.loader_kind,
+                        version.loader_version
+                    );
                 }
                 for save in &installation.saves {
                     println!("  save\t{}\t{}", save.name, save.path.display());
@@ -393,10 +399,20 @@ async fn play(
 
     let started = Instant::now();
     let mut child = launched.child;
+    let started_at = std::time::SystemTime::now();
     let status = child.wait().await.context("waiting for the game")?;
     instance.playtime_seconds += started.elapsed().as_secs();
     store.save(&id, &instance).await?;
     println!("Game exited: {status}");
+    if status.code().is_some_and(|code| code != 0) {
+        let crash =
+            heartwood::crash::analyze_session(&store.game_dir(&id), &launched.log_file, started_at)
+                .await;
+        println!("Crash: {} {:?}", crash.kind, crash.mods);
+        for line in crash.detail {
+            println!("  {line}");
+        }
+    }
     Ok(())
 }
 

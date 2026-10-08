@@ -553,8 +553,10 @@ async fn launch_instance(
 
     let core = Arc::clone(core);
     let watched = id.clone();
+    let game_dir = core.store.game_dir(&id);
     tokio::spawn(async move {
         let started = Instant::now();
+        let started_at = std::time::SystemTime::now();
         let mut child = launched.child;
         let status = child.wait().await;
         lock(&core.running).remove(&watched);
@@ -565,9 +567,16 @@ async fn launch_instance(
             }
         }
         let exit_code = status.ok().and_then(|status| status.code());
+        // A non-zero code is a crash; `None` means a signal, which is the player closing it.
+        let crash = match exit_code {
+            Some(0) | None => None,
+            Some(_) => Some(
+                heartwood::crash::analyze_session(&game_dir, &launched.log_file, started_at).await,
+            ),
+        };
         core.emit(
             "game.exited",
-            json!({ "instanceId": watched, "code": exit_code }),
+            json!({ "instanceId": watched, "code": exit_code, "crash": crash, "logPath": launched.log_file }),
         );
         core.emit(
             "instance.changed",

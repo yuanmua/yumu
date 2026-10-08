@@ -20,8 +20,18 @@ pub struct Scan {
 pub struct Installation {
     pub launcher: String,
     pub path: PathBuf,
-    pub versions: Vec<String>,
+    pub versions: Vec<FoundVersion>,
     pub saves: Vec<Save>,
+}
+
+/// A version another launcher installed, reduced to what `instance.create` needs.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FoundVersion {
+    pub id: String,
+    pub game_version: String,
+    pub loader_kind: String,
+    pub loader_version: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -47,7 +57,7 @@ pub async fn scan() -> Result<Scan> {
     {
         installations.push(Installation {
             launcher: "official".to_owned(),
-            versions: version_ids(&dir.join("versions")).await,
+            versions: versions_in(&dir.join("versions")).await,
             saves: saves_in(&dir.join("saves")).await,
             path: dir,
         });
@@ -123,16 +133,71 @@ async fn subdirs(dir: &Path) -> Vec<PathBuf> {
     dirs
 }
 
-async fn version_ids(dir: &Path) -> Vec<String> {
-    let mut ids = Vec::new();
+async fn versions_in(dir: &Path) -> Vec<FoundVersion> {
+    let mut versions = Vec::new();
     for version_dir in subdirs(dir).await {
-        if let Some(id) = version_dir.file_name().and_then(|n| n.to_str())
-            && version_dir.join(format!("{id}.json")).is_file()
-        {
-            ids.push(id.to_owned());
-        }
+        let Some(id) = version_dir.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        let Ok(text) = tokio::fs::read_to_string(version_dir.join(format!("{id}.json"))).await
+        else {
+            continue;
+        };
+        let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else {
+            continue;
+        };
+        versions.push(describe_version(id, &json));
     }
-    ids
+    versions
+}
+
+/// Game version from `inheritsFrom`, loader from the libraries or the FML arguments.
+fn describe_version(id: &str, json: &serde_json::Value) -> FoundVersion {
+    let game_version = json["inheritsFrom"].as_str().unwrap_or(id).to_owned();
+    let libraries: Vec<&str> = json["libraries"]
+        .as_array()
+        .map(|libs| libs.iter().filter_map(|l| l["name"].as_str()).collect())
+        .unwrap_or_default();
+    let arguments: Vec<&str> = json["arguments"]["game"]
+        .as_array()
+        .map(|args| args.iter().filter_map(serde_json::Value::as_str).collect())
+        .unwrap_or_default();
+    let after = |flag: &str| {
+        arguments
+            .iter()
+            .position(|a| *a == flag)
+            .and_then(|i| arguments.get(i + 1))
+            .map(|v| (*v).to_owned())
+    };
+    let library_version = |prefix: &str| {
+        libraries
+            .iter()
+            .find_map(|name| name.strip_prefix(prefix))
+            .map(|rest| rest.split(':').next().unwrap_or(rest).to_owned())
+    };
+    let (loader_kind, loader_version) = if let Some(v) = after("--fml.neoForgeVersion") {
+        ("neoforge", v)
+    } else if let Some(v) = after("--fml.forgeVersion") {
+        ("forge", v)
+    } else if let Some(v) = library_version("net.fabricmc:fabric-loader:") {
+        ("fabric", v)
+    } else if let Some(v) = library_version("org.quiltmc:quilt-loader:") {
+        ("quilt", v)
+    } else if let Some(v) = library_version("net.minecraftforge:forge:") {
+        (
+            "forge",
+            v.split_once('-')
+                .map_or(v.clone(), |(_, loader)| loader.to_owned()),
+        )
+    } else {
+        ("vanilla", String::new())
+    };
+    FoundVersion {
+        id: id.to_owned(),
+        game_version,
+        loader_kind: loader_kind.to_owned(),
+        loader_version,
+    }
 }
 
 async fn saves_in(dir: &Path) -> Vec<Save> {
@@ -213,4 +278,38 @@ async fn java_installs() -> Vec<JavaInstall> {
     }
     found.sort_by_key(|java| std::cmp::Reverse(java.major));
     found
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn detects_loaders_from_other_launchers() {
+        let neo = json!({"inheritsFrom": "1.21.1", "arguments": {"game": ["--fml.neoForgeVersion", "21.1.209"]}});
+        let found = describe_version("1.21.1-NeoForge", &neo);
+        assert_eq!(
+            (
+                found.game_version.as_str(),
+                found.loader_kind.as_str(),
+                found.loader_version.as_str()
+            ),
+            ("1.21.1", "neoforge", "21.1.209")
+        );
+        let fabric = json!({"inheritsFrom": "26.2", "libraries": [{"name": "net.fabricmc:fabric-loader:0.19.5"}]});
+        assert_eq!(
+            describe_version("26.2-Fabric", &fabric).loader_version,
+            "0.19.5"
+        );
+        let legacy = json!({"inheritsFrom": "1.12.2", "libraries": [{"name": "net.minecraftforge:forge:1.12.2-14.23.5.2864"}]});
+        assert_eq!(
+            describe_version("1.12.2-Forge", &legacy).loader_version,
+            "14.23.5.2864"
+        );
+        assert_eq!(
+            describe_version("1.21.1", &json!({})).loader_kind,
+            "vanilla"
+        );
+    }
 }

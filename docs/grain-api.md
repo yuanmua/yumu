@@ -41,7 +41,7 @@ const char* grain_api_version(void);                    // 接口版本，semver
 |---|---|---|---|
 | `grain` | `ping`、`info` → `{version, offlineWithoutMicrosoft}` | 同步 | 已实现 |
 | `instance` | `get {id}` → 全部可编辑设置；`update {id, name?, javaProvider?, javaPath?, maxMb?, extraArgs?, width?, height?}` | 同步 | 已实现 |
-| `discover` | `scan` → `{installations:[{launcher, path, versions, saves:[{name, path, lastPlayed}]}], java:[{path, version, major}]}` | 异步 | 已实现 |
+| `discover` | `scan` → `{installations:[{launcher, path, versions:[{id, gameVersion, loaderKind, loaderVersion}], saves:[{name, path, lastPlayed}]}], java:[{path, version, major}]}`；版本的加载器从其他启动器的版本 JSON 推断 | 异步 | 已实现 |
 | `discover` | `importSave {id, path}` → `{name}`，拷贝存档进实例 | 异步 | 已实现 |
 | `instance` | `list`、`create {name, gameVersion, loaderKind?, loaderVersion?}`、`delete {id}` | 同步 | 已实现 |
 | `instance` | `launch {id}`：用当前账号补齐缺失文件后启动，结果 `{pid}` | 异步 | 已实现 |
@@ -76,7 +76,7 @@ const char* grain_api_version(void);                    // 接口版本，semver
 | `task.cancelled` | `{taskId}` |
 | `instance.changed` | `{id, change}` |
 | `game.started` | `{instanceId, pid}` |
-| `game.exited` | `{instanceId, code, crashReportPath?}` |
+| `game.exited` | `{instanceId, code, logPath, crash?}`；退出码非零时 `crash` 为 `{kind, detail[], mods[], reportPath?}`，`kind` 七选一：`OUT_OF_MEMORY`、`JAVA_VERSION`、`NATIVES`、`MOD_DEPENDENCY`、`MOD_CONFLICT`、`GRAPHICS`、`UNKNOWN`；被信号结束（玩家手动关闭）时没有 `crash` |
 | `account.loginCode` | `{userCode, verificationUri}` |
 | `account.changed` | `{active}` |
 

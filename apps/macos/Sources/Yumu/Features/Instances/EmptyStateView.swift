@@ -4,7 +4,6 @@ struct EmptyStateView: View {
     @Binding var showingNew: Bool
     @Binding var importing: Bool
     @Binding var browsing: Bool
-    @Binding var discovering: Bool
 
     var body: some View {
         VStack(spacing: Bark.Space.lg) {
@@ -23,8 +22,6 @@ struct EmptyStateView: View {
                 Button(L("packs.browse")) { browsing = true }
                 Button(L("empty.import")) { importing = true }
             }
-            Button(L("discover.button")) { discovering = true }
-                .buttonStyle(.link)
             .controlSize(.large)
             .padding(.top, Bark.Space.sm)
             Text(L("import.drop"))

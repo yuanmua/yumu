@@ -3,6 +3,7 @@
 
 pub mod account;
 pub mod auth;
+pub mod crash;
 pub mod discover;
 pub mod download;
 pub mod error;

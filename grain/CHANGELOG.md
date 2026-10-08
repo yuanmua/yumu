@@ -2,6 +2,9 @@
 
 ## 未发布
 
+- `game.exited` 新增 `logPath` 与 `crash`（崩溃原因分类）。
+- `discover.scan` 的 `versions` 从字符串数组改为 `{id, gameVersion, loaderKind, loaderVersion}` 对象数组。
+
 - 新增方法：`grain.info`、`instance.get`、`instance.update`、`discover.scan`、`discover.importSave`。
 - 开发版特性 `dev-offline`：`grain.info.offlineWithoutMicrosoft` 为 true 时离线账号不要求先有微软账号。
 

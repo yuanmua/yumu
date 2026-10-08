@@ -6,7 +6,6 @@ struct ContentView: View {
     @State private var showingNew = false
     @State private var importing = false
     @State private var browsing = false
-    @State private var discovering = false
     @State private var dropTargeted = false
 
     private static let mrpack = UTType(filenameExtension: "mrpack") ?? .zip
@@ -21,12 +20,12 @@ struct ContentView: View {
                 )
             } else {
                 NavigationSplitView {
-                    InstanceList(showingNew: $showingNew, importing: $importing, browsing: $browsing, discovering: $discovering)
+                    InstanceList(showingNew: $showingNew, importing: $importing, browsing: $browsing)
                 } detail: {
                     if let instance = model.selected {
                         InstanceDetailView(instance: instance)
                     } else {
-                        EmptyStateView(showingNew: $showingNew, importing: $importing, browsing: $browsing, discovering: $discovering)
+                        EmptyStateView(showingNew: $showingNew, importing: $importing, browsing: $browsing)
                     }
                 }
                 .overlay { if dropTargeted { dropOverlay } }
@@ -38,7 +37,6 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showingNew) { NewInstanceSheet() }
         .sheet(isPresented: $browsing) { ModpackBrowserSheet() }
-        .sheet(isPresented: $discovering) { DiscoverSheet() }
         .fileImporter(isPresented: $importing, allowedContentTypes: [Self.mrpack]) { result in
             if case .success(let url) = result { model.importPack(url) }
         }
@@ -80,33 +78,39 @@ struct InstanceList: View {
     @Binding var showingNew: Bool
     @Binding var importing: Bool
     @Binding var browsing: Bool
-    @Binding var discovering: Bool
     @State private var pendingDelete: InstanceSummary?
 
     var body: some View {
         @Bindable var model = model
-        List(model.instances, selection: $model.selectedID) { instance in
-            InstanceRow(instance: instance, activity: model.activity[instance.id])
-                .tag(instance.id)
-                .contextMenu {
-                    Button(L("instances.delete"), role: .destructive) { pendingDelete = instance }
+        List(selection: $model.selectedID) {
+            ForEach(model.instances) { instance in
+                InstanceRow(instance: instance, activity: model.activity[instance.id])
+                    .tag(instance.id)
+                    .contextMenu {
+                        Button(L("instances.delete"), role: .destructive) { pendingDelete = instance }
+                    }
+            }
+            if !model.foundVersions.isEmpty || !model.foundSaves.isEmpty {
+                Section(L("sidebar.found")) {
+                    ForEach(model.foundVersions) { found in FoundVersionRow(found: found) }
+                    ForEach(model.foundSaves) { save in FoundSaveRow(save: save) }
                 }
-        }
-        .navigationTitle(L("instances.title"))
-        .navigationSplitViewColumnWidth(min: 200, ideal: 240)
-        .toolbar {
-            ToolbarItemGroup {
-                Button { discovering = true } label: { Label(L("discover.button"), systemImage: "externaldrive.badge.magnifyingglass") }
-                Button { browsing = true } label: { Label(L("packs.browse"), systemImage: "shippingbox") }
-                Button { importing = true } label: { Label(L("import.title"), systemImage: "square.and.arrow.down") }
-                Button { showingNew = true } label: { Label(L("instances.new"), systemImage: "plus") }
+                .foregroundStyle(.secondary)
             }
         }
+        .navigationTitle(L("instances.title"))
+        .navigationSplitViewColumnWidth(min: 220, ideal: 260)
+        .toolbar(removing: .sidebarToggle)
+        .task { model.rescan() }
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 0) {
                 if case .some(let state) = model.importing { ImportStatus(state: state) }
                 Divider()
-                AccountBar()
+                HStack(spacing: 0) {
+                    AccountBar()
+                    AddMenu(showingNew: $showingNew, importing: $importing, browsing: $browsing)
+                }
+                .background(.bar)
             }
         }
         .barkAnimation(Bark.Motion.standard, value: model.instances)
@@ -148,6 +152,83 @@ private struct ImportStatus: View {
             return (Double(done) / Double(total)).formatted(.percent.precision(.fractionLength(0)))
         }
         return "…"
+    }
+}
+
+/// The "+" at the bottom of the sidebar: every way to get a new instance, in one place.
+struct AddMenu: View {
+    @Binding var showingNew: Bool
+    @Binding var importing: Bool
+    @Binding var browsing: Bool
+
+    var body: some View {
+        Menu {
+            Button(L("instances.new")) { showingNew = true }
+            Button(L("packs.browse")) { browsing = true }
+            Button(L("import.title")) { importing = true }
+        } label: {
+            Image(systemName: "plus")
+                .font(.title3)
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .padding(.trailing, Bark.Space.md)
+        .help(L("sidebar.add"))
+    }
+}
+
+/// A version another launcher has; one click makes it a Yumu instance.
+struct FoundVersionRow: View {
+    @Environment(AppModel.self) private var model
+    let found: FoundVersion
+
+    var body: some View {
+        HStack(spacing: Bark.Space.md) {
+            Image(systemName: found.loaderKind == "vanilla" ? "cube" : "puzzlepiece.extension")
+            VStack(alignment: .leading, spacing: 2) {
+                Text(found.id)
+                Text(subtitle).font(.caption)
+            }
+            Spacer()
+            Button(L("sidebar.found.add")) {
+                model.createInstance(name: found.id, version: found.gameVersion, loader: found.loaderKind, loaderVersion: found.loaderVersion)
+            }
+            .controlSize(.small)
+        }
+        .padding(.vertical, 2)
+    }
+
+    private var subtitle: String {
+        let loader = found.loaderKind == "vanilla" ? L("detail.vanilla") : L("loader.\(found.loaderKind)")
+        let version = found.loaderVersion.isEmpty ? "" : " \(found.loaderVersion)"
+        return "\(loader)\(version) · \(found.gameVersion)"
+    }
+}
+
+/// A world from another launcher; imports into whichever instance is selected.
+struct FoundSaveRow: View {
+    @Environment(AppModel.self) private var model
+    let save: Save
+
+    var body: some View {
+        HStack(spacing: Bark.Space.md) {
+            Image(systemName: "globe.americas")
+            VStack(alignment: .leading, spacing: 2) {
+                Text(save.name)
+                Text(L("sidebar.found.save")).font(.caption)
+            }
+            Spacer()
+            Button(L("sidebar.found.add")) {
+                if let id = model.selectedID { model.importSave(save.path, into: id) }
+            }
+            .controlSize(.small)
+            .disabled(model.selectedID == nil || model.importingSave)
+            .help(model.selectedID == nil ? L("sidebar.found.selectFirst") : L("sidebar.found.importHere"))
+        }
+        .padding(.vertical, 2)
     }
 }
 

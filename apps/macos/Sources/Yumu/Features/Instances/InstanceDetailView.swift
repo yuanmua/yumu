@@ -84,6 +84,15 @@ struct InstanceDetailView: View {
 
     @ViewBuilder
     private var status: some View {
+        if activity == nil, let crashed = model.crashes[instance.id] {
+            CrashStatus(instance: instance, crash: crashed.crash, logPath: crashed.logPath, showMods: { tab = .mods })
+        } else {
+            activityStatus
+        }
+    }
+
+    @ViewBuilder
+    private var activityStatus: some View {
         switch activity {
         case .preparing:
             HStack(spacing: Bark.Space.sm) {

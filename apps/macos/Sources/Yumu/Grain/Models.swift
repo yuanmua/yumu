@@ -122,8 +122,29 @@ struct Scan: Decodable, Hashable, Sendable {
 struct Installation: Decodable, Hashable, Sendable {
     let launcher: String
     let path: String
-    let versions: [String]
+    let versions: [FoundVersion]
     let saves: [Save]
+}
+
+struct FoundVersion: Decodable, Identifiable, Hashable, Sendable {
+    let id: String
+    let gameVersion: String
+    let loaderKind: String
+    let loaderVersion: String
+}
+
+struct Crash: Decodable, Hashable, Sendable {
+    let kind: String
+    let detail: [String]
+    let mods: [String]
+    let reportPath: String?
+}
+
+struct GameExited: Decodable, Sendable {
+    let instanceId: String
+    let code: Int?
+    let crash: Crash?
+    let logPath: String?
 }
 
 struct Save: Decodable, Identifiable, Hashable, Sendable {
@@ -147,7 +168,12 @@ struct Empty: Codable, Sendable {}
 struct NameParams: Encodable, Sendable { let name: String }
 struct ProjectParams: Encodable, Sendable { let projectId: String }
 struct IdParams: Codable, Sendable { let id: String }
-struct CreateParams: Encodable, Sendable { let name: String; let gameVersion: String; let loaderKind: String }
+struct CreateParams: Encodable, Sendable {
+    let name: String
+    let gameVersion: String
+    let loaderKind: String
+    var loaderVersion: String = ""
+}
 struct LaunchParams: Encodable, Sendable { let id: String }
 struct VersionParams: Encodable, Sendable { let snapshots: Bool }
 struct SearchParams: Encodable, Sendable {

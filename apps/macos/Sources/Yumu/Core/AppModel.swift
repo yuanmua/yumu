@@ -44,6 +44,7 @@ final class AppModel {
     private(set) var scan: Scan?
     private(set) var scanning = false
     private(set) var importingSave = false
+    private(set) var crashes: [String: (crash: Crash, logPath: String?)] = [:]
     private(set) var loginCode: LoginCode?
     private(set) var loggingIn = false
     var error: GrainError?
@@ -69,6 +70,15 @@ final class AppModel {
         instances.first { $0.id == selectedID }
     }
 
+    /// Versions other launchers have that no instance covers yet, and worlds from everywhere.
+    var foundVersions: [FoundVersion] {
+        (scan?.installations ?? []).flatMap(\.versions).filter { found in
+            !instances.contains { $0.gameVersion == found.gameVersion && $0.loaderKind == found.loaderKind }
+        }
+    }
+
+    var foundSaves: [Save] { (scan?.installations ?? []).flatMap(\.saves) }
+
     var activeAccount: AccountSummary? { accounts.first { $0.active } }
     var hasMicrosoftAccount: Bool { accounts.contains { $0.isMicrosoft } }
     var canAddOffline: Bool { hasMicrosoftAccount || offlineWithoutMicrosoft }
@@ -88,10 +98,10 @@ final class AppModel {
         if selectedID == nil { selectedID = instances.first?.id }
     }
 
-    func createInstance(name: String, version: String, loader: String) {
+    func createInstance(name: String, version: String, loader: String, loaderVersion: String = "") {
         guard let client else { return }
         do {
-            let params = CreateParams(name: name, gameVersion: version, loaderKind: loader)
+            let params = CreateParams(name: name, gameVersion: version, loaderKind: loader, loaderVersion: loaderVersion)
             let created: IdParams = try client.call("instance.create", params)
             refresh()
             selectedID = created.id
@@ -116,6 +126,7 @@ final class AppModel {
             let taskId = try client.start("instance.launch", LaunchParams(id: id))
             tasks[taskId] = .launch(id)
             activity[id] = .preparing
+            crashes[id] = nil
         } catch {
             report(error)
         }
@@ -435,7 +446,9 @@ final class AppModel {
             case "game.started":
                 activity[try decoder.decode(Envelope<GameEvent>.self, from: event.data).payload.instanceId] = .running
             case "game.exited":
-                activity[try decoder.decode(Envelope<GameEvent>.self, from: event.data).payload.instanceId] = nil
+                let exited = try decoder.decode(Envelope<GameExited>.self, from: event.data).payload
+                activity[exited.instanceId] = nil
+                if let crash = exited.crash { crashes[exited.instanceId] = (crash, exited.logPath) }
             case "instance.changed":
                 refresh()
             case "account.loginCode":

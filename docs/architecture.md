@@ -59,6 +59,7 @@ heartwood/
 │       ├── modpack.rs  .mrpack 导入
 │       ├── resource.rs 光影包与资源包
 │       ├── discover.rs 本机已有的存档、版本与 Java
+│       ├── crash.rs    崩溃原因分类
     │       └── discover.rs 识别本机已有的 Minecraft 安装与存档
     ├── grain/              C ABI 层：extern "C" 函数、句柄、回调、JSON 编解码。头文件 include/grain.h 手写
     └── yumu/               命令行二进制
