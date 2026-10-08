@@ -20,8 +20,8 @@ Yumu 是分发给全球用户的启动器，碰到的每个外部来源都要先
 | Oracle JDK | | Oracle NFTC / OTN，禁止再分发 | **禁止**，任何情况下不下载 |
 | `meta.fabricmc.net`、`maven.fabricmc.net` | Fabric 加载器与库 | Apache 2.0 | 允许 |
 | `meta.quiltmc.org`、`maven.quiltmc.org` | Quilt 加载器与库 | Apache 2.0 | 允许 |
-| `maven.minecraftforge.net`、`maven.neoforged.net` | Forge / NeoForge 安装器 | LGPL 2.1；Prism 等启动器直接从 maven 取安装器 | 允许，阶段 4 后半接入 |
-| `api.modrinth.com`、`cdn.modrinth.com` | 模组、整合包元数据与文件 | Modrinth API 条款：必须带可识别的 User-Agent，遵守速率限制 | 允许。`.mrpack` 内文件只允许来自 cdn.modrinth.com、github.com、raw.githubusercontent.com、gitlab.com（Modrinth 格式规范） |
+| `maven.minecraftforge.net`、`maven.neoforged.net`、`files.minecraftforge.net`（版本推荐表） | Forge / NeoForge 安装器与库 | LGPL 2.1；Prism 等启动器同样直接从 maven 取安装器，安装器处理器在用户机器上本地运行 | 允许，已接入（1.13+） |
+| `api.modrinth.com`、`cdn.modrinth.com` | 模组、整合包、光影、资源包的元数据与文件 | Modrinth API 条款：必须带可识别的 User-Agent，遵守速率限制 | 允许。`.mrpack` 内文件只允许来自 cdn.modrinth.com、github.com、raw.githubusercontent.com、gitlab.com（Modrinth 格式规范） |
 | CurseForge API | 模组、整合包 | 需要 API key；文件带 `allowModDistribution=false` 时不得第三方下载 | 阶段 4 后半接入。被禁止的文件跳转浏览器让用户手动下载 |
 | OptiFine | 光影前置 | 作者禁止再分发，只能从 optifine.net 下载 | 不自动下载，引导用户去官网，下载后拖进 Yumu |
 | BMCLAPI 等社区镜像 | Mojang 文件的镜像 | 灰色地带 | 不默认，不推荐；仅作为用户显式选择的可选项，并提示风险 |
@@ -40,19 +40,15 @@ Yumu 是分发给全球用户的启动器，碰到的每个外部来源都要先
 2. 平台配置选"移动和桌面应用程序"，勾选 `https://login.microsoftonline.com/common/oauth2/nativeclient`。设备码流程不需要回调地址。
 3. 在"API 权限"里加 `XboxLive.signin`、`offline_access`。
 4. 填写 Mojang 的 [Minecraft API 接入申请表](https://aka.ms/mce-reviewappid)，提供应用 ID 与用途说明，通常几天到几周批复。
-5. 批复后把 client ID 写进 `hw-auth` 的常量。它可以公开，不是秘密。
+5. client ID 写在 `heartwood/crates/heartwood/src/auth.rs` 的 `CLIENT_ID`。它可以公开，不是秘密。
 
-未批复期间可以用本机已安装官方启动器的凭据做开发测试，但不能发布。
+当前状态：应用已在 Azure 注册（账户类型"仅限个人账户"，因此令牌端点用 `/consumers` 租户；"允许公共客户端流"已开启，走设备码流程）。Mojang 的接入申请表计划在软件功能完整后提交；批复前 `login_with_xbox` 一步会返回 403，核心把它映射为 `AUTH_APP_NOT_APPROVED`，界面给出明确提示。
 
-## 5. 离线账号策略（待决定）
+令牌存放：`<数据目录>/accounts.toml`，权限 0600，与 Prism 的 `accounts.json` 做法相同。系统钥匙串是后续改进项。
 
-离线账号绕过了正版验证。参考做法：
+## 5. 离线账号策略
 
-- Prism：必须先添加至少一个微软账号，之后才允许创建离线账号。
-- HMCL、PCL2：直接允许离线账号。
-- Modrinth App：只支持微软账号。
-
-建议采用 Prism 的做法，在合规与单机便利之间取平衡。这是产品决定，由 yuanmu 拍板后写 ADR，阶段 2 的 `account.*` 落地时实现。目前开发阶段允许离线账号。
+已决定跟随 Prism（ADR 0009）：必须先有至少一个微软账号，才允许添加离线账号；最后一个微软账号移除时离线账号一并删除。核心强制，界面只是置灰。
 
 ## 6. 游戏文件缓存的边界
 

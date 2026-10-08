@@ -1,4 +1,20 @@
 /* Generated from bark/i18n/zh-Hans.json. Do not edit. */
+"account.add" = "添加";
+"account.addMicrosoft" = "用微软账号登录…";
+"account.addOffline" = "添加离线账号…";
+"account.kind.microsoft" = "微软";
+"account.kind.offline" = "离线";
+"account.login.copied" = "已复制";
+"account.login.instructions" = "在刚打开的微软页面里输入这个代码，代码已复制到剪贴板。";
+"account.login.open" = "再次打开页面";
+"account.login.title" = "微软账号登录";
+"account.login.waiting" = "等待你在浏览器里完成登录…";
+"account.none" = "没有账号";
+"account.offline.name" = "玩家名";
+"account.offline.title" = "添加离线账号";
+"account.offlineHint" = "先用微软账号登录，之后才能添加离线账号。";
+"account.remove" = "移除账号";
+"account.title" = "账号";
 "app.name" = "Yumu";
 "common.cancel" = "取消";
 "detail.installing" = "正在安装… %@ / %@";
@@ -18,6 +34,13 @@
 "empty.import" = "导入整合包";
 "empty.subtitle" = "新建一个实例，或者导入整合包，剩下的交给 Yumu。";
 "empty.title" = "还没有实例";
+"error.ACCOUNT_NOT_FOUND" = "账号 {id} 不存在。";
+"error.ACCOUNT_OFFLINE_REQUIRES_MICROSOFT" = "先用微软账号登录，之后才能添加离线账号。";
+"error.ACCOUNT_REQUIRED" = "开始游戏前先添加一个账号。";
+"error.AUTH_APP_NOT_APPROVED" = "Mojang 还没有批准 Yumu 的登录申请，批准前无法用微软账号登录。";
+"error.AUTH_FAILED" = "登录失败：{detail}。";
+"error.AUTH_NO_GAME" = "这个账号没有购买 Minecraft Java 版。";
+"error.AUTH_NO_XBOX_ACCOUNT" = "这个微软账号还没有 Xbox 档案，先去 xbox.com 登录一次即可创建。";
 "error.CANCELLED" = "操作已取消。";
 "error.DOWNLOAD_HASH_MISMATCH" = "下载的文件已损坏，将会重试。";
 "error.DOWNLOAD_HOST_NOT_ALLOWED" = "已阻止从 {url} 下载，该来源不在允许范围内。";
@@ -34,6 +57,7 @@
 "error.INVALID_TOML" = "文件 {path} 格式不正确。";
 "error.IO" = "无法读写 {path}。";
 "error.JAVA_UNAVAILABLE" = "这台电脑没有可用的 Java 运行时。";
+"error.LOADER_INSTALL_FAILED" = "模组加载器安装在 {step} 这一步失败了。";
 "error.MALFORMED_DATA" = "数据异常：{detail}。";
 "error.MOD_NOT_COMPATIBLE" = "这个模组没有适用于 {gameVersion} 上 {loader} 的版本。";
 "error.NO_HOME_DIRECTORY" = "找不到你的用户目录。";
@@ -51,6 +75,8 @@
 "instances.new" = "新建实例";
 "instances.title" = "实例";
 "loader.fabric" = "Fabric";
+"loader.forge" = "Forge";
+"loader.neoforge" = "NeoForge";
 "loader.quilt" = "Quilt";
 "loader.vanilla" = "原版";
 "mods.downloads" = "%@ 次下载";
@@ -69,6 +95,10 @@
 "new.name" = "名称";
 "new.title" = "新建实例";
 "new.version" = "版本";
+"packs.browse" = "浏览整合包";
+"packs.hint" = "安装会新建一个实例，整合包需要的东西全部自动装好。";
+"packs.install" = "安装";
+"packs.search.placeholder" = "搜索 Modrinth 整合包…";
 "resources.add" = "添加…";
 "resources.empty" = "这里还什么都没有。";
 "resources.resourcePacks" = "资源包";

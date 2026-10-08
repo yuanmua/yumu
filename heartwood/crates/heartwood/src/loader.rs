@@ -1,4 +1,5 @@
-//! Mod loaders that publish a version JSON profile: Fabric and Quilt.
+//! Mod loaders. Fabric and Quilt publish a version JSON profile directly; Forge and `NeoForge`
+//! ship an installer that `forge.rs` unpacks and runs.
 
 use std::path::{Path, PathBuf};
 
@@ -6,6 +7,7 @@ use serde::Deserialize;
 
 use crate::download::Downloader;
 use crate::error::{Error, Result, io};
+use crate::forge;
 use crate::mojang::VersionJson;
 
 pub const VANILLA: &str = "vanilla";
@@ -49,7 +51,11 @@ fn meta(kind: &str) -> Result<&'static Meta> {
 }
 
 pub fn is_supported(kind: &str) -> bool {
-    kind == VANILLA || LOADERS.iter().any(|meta| meta.kind == kind)
+    kind == VANILLA || is_forge_like(kind) || LOADERS.iter().any(|meta| meta.kind == kind)
+}
+
+pub fn is_forge_like(kind: &str) -> bool {
+    kind == forge::FORGE || kind == forge::NEOFORGE
 }
 
 /// Loader versions for a game version, newest first.
@@ -58,6 +64,9 @@ pub async fn list_versions(
     kind: &str,
     game_version: &str,
 ) -> Result<Vec<LoaderVersion>> {
+    if is_forge_like(kind) {
+        return forge::list_versions(downloader, kind, game_version).await;
+    }
     let url = meta(kind)?.versions.replace("{game}", game_version);
     let entries: Vec<Entry> = downloader.get_json(&url).await?;
     Ok(entries
@@ -84,6 +93,9 @@ pub async fn latest(downloader: &Downloader, kind: &str, game_version: &str) -> 
 
 /// Version id of a loader profile, as the loader's own meta server names it.
 pub fn profile_id(kind: &str, loader_version: &str, game_version: &str) -> String {
+    if is_forge_like(kind) {
+        return forge::profile_id(kind, loader_version, game_version);
+    }
     format!("{kind}-loader-{loader_version}-{game_version}")
 }
 
@@ -95,6 +107,10 @@ pub async fn ensure_profile(
     loader_version: &str,
     game_version: &str,
 ) -> Result<PathBuf> {
+    if is_forge_like(kind) {
+        return forge::ensure_profile(downloader, cache_dir, kind, loader_version, game_version)
+            .await;
+    }
     let id = profile_id(kind, loader_version, game_version);
     let file = cache_dir
         .join("versions")

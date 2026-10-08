@@ -51,7 +51,13 @@ heartwood/
     │       ├── instance.rs 实例模型与 TOML 读写
     │       ├── install.rs  把一个实例补齐到可启动：版本、库、资源、natives、Java
     │       ├── launch.rs   组装参数、拉起游戏、日志落盘
-    │       ├── account.rs  离线账号；微软登录后续加入
+    │       ├── account.rs  账号列表与会话；离线账号规则见 ADR 0009
+│       ├── auth.rs     微软设备码登录与令牌刷新
+│       ├── loader.rs   Fabric、Quilt 的 profile
+│       ├── forge.rs    Forge、NeoForge 安装器与处理器
+│       ├── mods.rs     Modrinth 搜索、安装、依赖解析，本地模组列表
+│       ├── modpack.rs  .mrpack 导入
+│       ├── resource.rs 光影包与资源包
     │       └── discover.rs 识别本机已有的 Minecraft 安装与存档
     ├── grain/              C ABI 层：extern "C" 函数、句柄、回调、JSON 编解码。头文件 include/grain.h 手写
     └── yumu/               命令行二进制
@@ -73,7 +79,7 @@ heartwood/
 | 版本 JSON 里的 OS 名 | `osx` | `windows` | `linux` |
 | Mojang 运行时平台键 | `mac-os` / `mac-os-arm64` | `windows-x64` / `windows-arm64` | `linux` / `linux-i386` |
 | 缓存到实例的零拷贝 | APFS clonefile | 硬链接 | reflink，回退硬链接 |
-| 凭据存储 | Keychain | Credential Manager | Secret Service |
+| 凭据存储 | `accounts.toml` 0600（钥匙串为后续改进） | 同左 | 同左 |
 | 游戏进程分离 | 独立进程组 | 不加入 Job 对象 | 独立进程组 |
 
 可选能力用 Cargo feature 开关（例如 `curseforge`），不需要的构建直接裁掉。
@@ -90,7 +96,7 @@ heartwood/
 
 这些是写代码时的硬规则，不是建议：
 
-1. **所有写盘先写临时文件再重命名**，下载的文件校验哈希通过后才重命名到位。
+1. **所有写盘先写临时文件再重命名**，刚下载的文件校验哈希通过后才重命名到位。已在缓存里的文件日常只比对大小，不逐个哈希，全量校验留给显式的修复操作。
 2. **所有网络请求有连接超时与读超时**，失败按指数退避重试三次。
 3. **缓存可随时整体删除**，删了只是变慢。用户数据只在 `instances/`。
 4. **核心永不 panic 到界面**：C ABI 边界 `catch_unwind`，转成 `INTERNAL` 错误。

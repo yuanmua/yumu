@@ -59,6 +59,19 @@ pub fn inspect(path: &Path) -> Result<Summary> {
     Ok(summary)
 }
 
+/// Download a modpack from Modrinth into the cache and import it.
+pub async fn import_from_modrinth(
+    store: &Store,
+    downloader: &Downloader,
+    project_id: &str,
+    progress: &Arc<Progress>,
+) -> Result<String> {
+    let dir = store.cache_dir().join("downloads");
+    tokio::fs::create_dir_all(&dir).await.map_err(io(&dir))?;
+    let file_name = crate::mods::install_file(downloader, &dir, project_id, None, progress).await?;
+    import(store, downloader, &dir.join(file_name), None, progress).await
+}
+
 /// Create an instance from a `.mrpack`. On failure the half-made instance is removed again.
 pub async fn import(
     store: &Store,
@@ -165,9 +178,6 @@ fn read_index(path: &Path) -> Result<(Summary, MrpackIndex)> {
                 .map(|version| (key.trim_end_matches("-loader").to_owned(), version.clone()))
         })
         .unwrap_or_else(|| ("vanilla".to_owned(), String::new()));
-    if !crate::loader::is_supported(&loader_kind) {
-        return Err(Error::Unsupported("Forge and NeoForge modpacks"));
-    }
     let summary = Summary {
         name: index.name.clone(),
         version: index.version_id.clone(),

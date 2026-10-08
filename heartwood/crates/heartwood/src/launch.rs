@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 use std::process::Stdio;
 
-use crate::account::Account;
+use crate::account::Session;
 use crate::error::{Error, Result, io, now};
 use crate::install::Prepared;
 use crate::instance::{Instance, Store};
@@ -23,7 +23,7 @@ pub async fn launch(
     id: &str,
     instance: &mut Instance,
     prepared: &Prepared,
-    account: &Account,
+    session: &Session,
 ) -> Result<Launched> {
     let game_dir = store.game_dir(id);
     tokio::fs::create_dir_all(&game_dir)
@@ -48,12 +48,12 @@ pub async fn launch(
     let natives = prepared.natives_dir.display().to_string();
     let assets = prepared.assets_dir.display().to_string();
     let variables = [
-        ("auth_player_name", account.name.clone()),
-        ("auth_uuid", account.uuid.clone()),
-        ("auth_access_token", account.access_token.clone()),
-        ("user_type", account.user_type.clone()),
+        ("auth_player_name", session.name.clone()),
+        ("auth_uuid", session.uuid.clone()),
+        ("auth_access_token", session.access_token.clone()),
+        ("user_type", session.user_type.clone()),
         ("clientid", "0".to_owned()),
-        ("auth_xuid", "0".to_owned()),
+        ("auth_xuid", session.xuid.clone()),
         ("version_name", version.id.clone()),
         ("version_type", version.kind.clone()),
         ("game_directory", game_dir.display().to_string()),

@@ -5,6 +5,8 @@ struct ModsView: View {
     let instance: InstanceSummary
     @State private var query = ""
 
+    private var scope: SearchScope { .mods(instance.id) }
+
     var body: some View {
         if instance.isVanilla {
             ContentUnavailableView(L("mods.vanillaHint"), systemImage: "puzzlepiece.extension")
@@ -15,7 +17,6 @@ struct ModsView: View {
             }
             .task(id: instance.id) {
                 model.loadMods(instance.id)
-                model.clearSearch()
                 query = ""
             }
         }
@@ -63,62 +64,18 @@ struct ModsView: View {
 
     private var search: some View {
         VStack(alignment: .leading, spacing: Bark.Space.sm) {
-            HStack {
-                TextField(L("mods.search.placeholder"), text: $query)
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit { model.searchMods(instance.id, query: query) }
-                if model.searching { ProgressView().controlSize(.small) }
-            }
-            if let results = model.searchResults {
-                if results.isEmpty {
-                    Text(L("mods.noResults")).foregroundStyle(.secondary)
+            SearchField(scope: scope, query: $query, placeholderKey: "mods.search.placeholder")
+            SearchResults(scope: scope, emptyKey: "mods.noResults") { hit in
+                if model.installingProjects.contains(hit.projectId) {
+                    ProgressView().controlSize(.small)
+                } else if model.isInstalled(projectId: hit.projectId) {
+                    Text(L("mods.installedBadge")).font(.caption).foregroundStyle(.secondary)
                 } else {
-                    List(results) { hit in
-                        SearchRow(instance: instance, hit: hit)
-                    }
-                    .listStyle(.inset)
-                    .clipShape(RoundedRectangle(cornerRadius: Bark.Radius.md, style: .continuous))
+                    Button(L("mods.install")) { model.installMod(instance.id, projectId: hit.projectId) }
+                        .controlSize(.small)
                 }
-            } else {
-                Spacer()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .barkAnimation(Bark.Motion.standard, value: model.searchResults)
-    }
-}
-
-private struct SearchRow: View {
-    @Environment(AppModel.self) private var model
-    let instance: InstanceSummary
-    let hit: SearchHit
-
-    var body: some View {
-        HStack(spacing: Bark.Space.md) {
-            AsyncImage(url: hit.iconUrl.flatMap(URL.init)) { image in
-                image.resizable()
-            } placeholder: {
-                RoundedRectangle(cornerRadius: Bark.Radius.sm).fill(.quaternary)
-            }
-            .frame(width: 36, height: 36)
-            .clipShape(RoundedRectangle(cornerRadius: Bark.Radius.sm, style: .continuous))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(hit.title).lineLimit(1)
-                Text(hit.description).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                Text(String(format: L("mods.downloads"), hit.downloads.formatted(.number.notation(.compactName))))
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-            Spacer()
-            if model.installingProjects.contains(hit.projectId) {
-                ProgressView().controlSize(.small)
-            } else if model.isInstalled(projectId: hit.projectId) {
-                Text(L("mods.installedBadge")).font(.caption).foregroundStyle(.secondary)
-            } else {
-                Button(L("mods.install")) { model.installMod(instance.id, projectId: hit.projectId) }
-                    .controlSize(.small)
-            }
-        }
-        .padding(.vertical, 2)
     }
 }

@@ -74,14 +74,40 @@ enum ResourceKind: String, CaseIterable, Sendable {
     var titleKey: String {
         self == .shaderpacks ? "resources.shaders" : "resources.resourcePacks"
     }
+
+    var projectType: String {
+        self == .shaderpacks ? "shader" : "resourcepack"
+    }
+}
+
+struct AccountSummary: Codable, Identifiable, Hashable, Sendable {
+    let id: String
+    let kind: String
+    let name: String
+    let uuid: String
+    let active: Bool
+
+    var isMicrosoft: Bool { kind == "microsoft" }
+}
+
+struct LoginCode: Decodable, Hashable, Sendable {
+    let userCode: String
+    let verificationUri: String
 }
 
 struct Empty: Codable, Sendable {}
+struct NameParams: Encodable, Sendable { let name: String }
+struct ProjectParams: Encodable, Sendable { let projectId: String }
 struct IdParams: Codable, Sendable { let id: String }
 struct CreateParams: Encodable, Sendable { let name: String; let gameVersion: String; let loaderKind: String }
-struct LaunchParams: Encodable, Sendable { let id: String; let playerName: String }
+struct LaunchParams: Encodable, Sendable { let id: String }
 struct VersionParams: Encodable, Sendable { let snapshots: Bool }
-struct SearchParams: Encodable, Sendable { let id: String; let query: String; let offset: UInt32 }
+struct SearchParams: Encodable, Sendable {
+    let id: String?
+    let projectType: String
+    let query: String
+    var offset: UInt32 = 0
+}
 struct ModInstallParams: Encodable, Sendable { let id: String; let projectId: String }
 struct FileParams: Encodable, Sendable { let id: String; let fileName: String; let enabled: Bool }
 struct ResourceParams: Encodable, Sendable {
@@ -90,6 +116,7 @@ struct ResourceParams: Encodable, Sendable {
     var fileName: String = ""
     var enabled: Bool = false
     var path: String = ""
+    var projectId: String = ""
 }
 struct PackParams: Encodable, Sendable { let path: String }
 

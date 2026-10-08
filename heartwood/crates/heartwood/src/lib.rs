@@ -2,8 +2,10 @@
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 pub mod account;
+pub mod auth;
 pub mod download;
 pub mod error;
+pub mod forge;
 pub mod install;
 pub mod instance;
 pub mod java;

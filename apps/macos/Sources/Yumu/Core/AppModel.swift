@@ -10,9 +10,17 @@ enum Activity: Equatable, Sendable {
 private enum TaskKind {
     case launch(String)
     case versions
-    case search(String)
+    case search(SearchScope)
     case installMod(instance: String, project: String)
+    case installResource(instance: String, kind: ResourceKind, project: String)
     case importPack
+    case login
+}
+
+enum SearchScope: Hashable, Sendable {
+    case mods(String)
+    case resources(String, ResourceKind)
+    case packs
 }
 
 @MainActor
@@ -24,10 +32,13 @@ final class AppModel {
     private(set) var versions: VersionList?
     private(set) var mods: [LocalMod] = []
     private(set) var resources: [ResourceKind: [ResourceFile]] = [:]
-    private(set) var searchResults: [SearchHit]?
-    private(set) var searching = false
+    private(set) var searchResults: [SearchScope: [SearchHit]] = [:]
+    private(set) var searching: Set<SearchScope> = []
     private(set) var installingProjects: Set<String> = []
     private(set) var importing: Activity?
+    private(set) var accounts: [AccountSummary] = []
+    private(set) var loginCode: LoginCode?
+    private(set) var loggingIn = false
     var error: GrainError?
     let startupError: String?
 
@@ -47,6 +58,9 @@ final class AppModel {
     var selected: InstanceSummary? {
         instances.first { $0.id == selectedID }
     }
+
+    var activeAccount: AccountSummary? { accounts.first { $0.active } }
+    var hasMicrosoftAccount: Bool { accounts.contains { $0.isMicrosoft } }
 
     // MARK: Instances
 
@@ -85,10 +99,10 @@ final class AppModel {
         }
     }
 
-    func play(_ id: String, playerName: String) {
+    func play(_ id: String) {
         guard let client, activity[id] == nil else { return }
         do {
-            let taskId = try client.start("instance.launch", LaunchParams(id: id, playerName: playerName))
+            let taskId = try client.start("instance.launch", LaunchParams(id: id))
             tasks[taskId] = .launch(id)
             activity[id] = .preparing
         } catch {
@@ -136,19 +150,24 @@ final class AppModel {
         }
     }
 
-    func searchMods(_ id: String, query: String) {
+    func search(_ scope: SearchScope, query: String) {
         guard let client else { return }
+        let params: SearchParams = switch scope {
+        case .mods(let id): SearchParams(id: id, projectType: "mod", query: query)
+        case .resources(let id, let kind): SearchParams(id: id, projectType: kind.projectType, query: query)
+        case .packs: SearchParams(id: nil, projectType: "modpack", query: query)
+        }
         do {
-            tasks[try client.start("mod.search", SearchParams(id: id, query: query, offset: 0))] = .search(id)
-            searching = true
+            tasks[try client.start("mod.search", params)] = .search(scope)
+            searching.insert(scope)
         } catch {
             report(error)
         }
     }
 
-    func clearSearch() {
-        searchResults = nil
-        searching = false
+    func clearSearch(_ scope: SearchScope) {
+        searchResults[scope] = nil
+        searching.remove(scope)
     }
 
     func installMod(_ id: String, projectId: String) {
@@ -164,6 +183,17 @@ final class AppModel {
 
     func isInstalled(projectId: String) -> Bool {
         mods.contains { $0.record?.projectId == projectId }
+    }
+
+    func installResource(_ id: String, kind: ResourceKind, projectId: String) {
+        guard let client, !installingProjects.contains(projectId) else { return }
+        do {
+            let params = ResourceParams(id: id, kind: kind.rawValue, projectId: projectId)
+            tasks[try client.start("resource.install", params)] = .installResource(instance: id, kind: kind, project: projectId)
+            installingProjects.insert(projectId)
+        } catch {
+            report(error)
+        }
     }
 
     // MARK: Resources
@@ -224,6 +254,74 @@ final class AppModel {
         }
     }
 
+    func installPack(projectId: String) {
+        guard let client, importing == nil else { return }
+        do {
+            tasks[try client.start("modpack.installModrinth", ProjectParams(projectId: projectId))] = .importPack
+            importing = .preparing
+        } catch {
+            report(error)
+        }
+    }
+
+    // MARK: Accounts
+
+    func loadAccounts() {
+        guard let client else { return }
+        do {
+            accounts = try client.call("account.list")
+        } catch {
+            report(error)
+        }
+    }
+
+    func beginMicrosoftLogin() {
+        guard let client, !loggingIn else { return }
+        do {
+            tasks[try client.start("account.beginMicrosoftLogin", Empty())] = .login
+            loggingIn = true
+        } catch {
+            report(error)
+        }
+    }
+
+    func cancelLogin() {
+        guard let client else { return }
+        for (taskId, kind) in tasks {
+            if case .login = kind { client.cancel(taskId) }
+        }
+    }
+
+    func addOfflineAccount(name: String) {
+        guard let client else { return }
+        do {
+            let _: [String: String] = try client.call("account.addOffline", NameParams(name: name))
+            loadAccounts()
+        } catch {
+            report(error)
+        }
+    }
+
+    func setActiveAccount(_ id: String) {
+        guard let client else { return }
+        do {
+            let _: [String: String] = try client.call("account.setActive", IdParams(id: id))
+            loadAccounts()
+        } catch {
+            report(error)
+        }
+    }
+
+    func removeAccount(_ id: String) {
+        guard let client else { return }
+        do {
+            let _: [String: String] = try client.call("account.remove", IdParams(id: id))
+            loadAccounts()
+        } catch {
+            report(error)
+        }
+    }
+
     // MARK: Events
 
     func listen() async {
@@ -250,12 +348,19 @@ final class AppModel {
                 switch tasks.removeValue(forKey: taskId) {
                 case .versions:
                     versions = try decoder.decode(Envelope<TaskCompleted<VersionList>>.self, from: event.data).payload.result
-                case .search:
-                    searchResults = try decoder.decode(Envelope<TaskCompleted<SearchResult>>.self, from: event.data).payload.result.hits
-                    searching = false
+                case .search(let scope):
+                    searchResults[scope] = try decoder.decode(Envelope<TaskCompleted<SearchResult>>.self, from: event.data).payload.result.hits
+                    searching.remove(scope)
                 case .installMod(let instance, let project):
                     installingProjects.remove(project)
                     if instance == selectedID { loadMods(instance) }
+                case .installResource(let instance, _, let project):
+                    installingProjects.remove(project)
+                    if instance == selectedID { loadResources(instance) }
+                case .login:
+                    loggingIn = false
+                    loginCode = nil
+                    loadAccounts()
                 case .importPack:
                     importing = nil
                     let created = try decoder.decode(Envelope<TaskCompleted<IdParams>>.self, from: event.data).payload.result
@@ -276,6 +381,10 @@ final class AppModel {
                 activity[try decoder.decode(Envelope<GameEvent>.self, from: event.data).payload.instanceId] = nil
             case "instance.changed":
                 refresh()
+            case "account.loginCode":
+                loginCode = try decoder.decode(Envelope<LoginCode>.self, from: event.data).payload
+            case "account.changed":
+                loadAccounts()
             default:
                 break
             }
@@ -287,9 +396,12 @@ final class AppModel {
     private func finish(task taskId: String) {
         switch tasks.removeValue(forKey: taskId) {
         case .launch(let id): activity[id] = nil
-        case .search: searching = false
-        case .installMod(_, let project): installingProjects.remove(project)
+        case .search(let scope): searching.remove(scope)
+        case .installMod(_, let project), .installResource(_, _, let project): installingProjects.remove(project)
         case .importPack: importing = nil
+        case .login:
+            loggingIn = false
+            loginCode = nil
         case .versions, nil: break
         }
     }

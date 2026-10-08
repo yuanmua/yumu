@@ -15,7 +15,7 @@
 ```
 Yumu/
 ├── settings.toml              全局设置
-├── accounts.toml              账号列表（不含 token，token 在系统钥匙串）
+├── accounts.toml              账号列表与微软刷新令牌，权限 0600
 ├── instances/
 │   └── <instance-id>/
 │       ├── instance.toml      实例定义，唯一真相
@@ -27,6 +27,8 @@ Yumu/
     ├── libraries/             Maven 布局，所有实例共享
     ├── assets/indexes/ objects/
     ├── natives/<version-id>/  解压后的 natives
+    ├── versions/<loader-id>/  加载器 profile；Forge/NeoForge 另有 installer.jar、install_profile.json、.processed 标记
+    ├── downloads/             从 Modrinth 下载的整合包文件
     ├── java/<component>/      Mojang 运行时
     └── meta/
         └── modrinth-index.json  sha1 → Modrinth 项目与版本，记录 Yumu 自己装过的模组

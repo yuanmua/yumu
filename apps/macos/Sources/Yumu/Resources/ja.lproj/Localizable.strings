@@ -1,4 +1,20 @@
 /* Generated from bark/i18n/ja.json. Do not edit. */
+"account.add" = "追加";
+"account.addMicrosoft" = "Microsoft アカウントでサインイン…";
+"account.addOffline" = "オフラインアカウントを追加…";
+"account.kind.microsoft" = "Microsoft";
+"account.kind.offline" = "オフライン";
+"account.login.copied" = "コピー済み";
+"account.login.instructions" = "開いた Microsoft のページにこのコードを入力してください。コードはクリップボードにコピー済みです。";
+"account.login.open" = "ページをもう一度開く";
+"account.login.title" = "Microsoft でサインイン";
+"account.login.waiting" = "ブラウザでのサインイン完了を待っています…";
+"account.none" = "アカウントなし";
+"account.offline.name" = "プレイヤー名";
+"account.offline.title" = "オフラインアカウントを追加";
+"account.offlineHint" = "先に Microsoft アカウントでサインインすると、オフラインアカウントを追加できます。";
+"account.remove" = "アカウントを削除";
+"account.title" = "アカウント";
 "app.name" = "Yumu";
 "common.cancel" = "キャンセル";
 "detail.installing" = "インストール中… %@ / %@";
@@ -18,6 +34,13 @@
 "empty.import" = "Modpack を読み込む";
 "empty.subtitle" = "インスタンスを作成するか、Modpack を読み込めば、あとは Yumu におまかせ。";
 "empty.title" = "インスタンスがありません";
+"error.ACCOUNT_NOT_FOUND" = "アカウント {id} は存在しません。";
+"error.ACCOUNT_OFFLINE_REQUIRES_MICROSOFT" = "オフラインアカウントを追加するには、先に Microsoft アカウントでサインインしてください。";
+"error.ACCOUNT_REQUIRED" = "プレイする前にアカウントを追加してください。";
+"error.AUTH_APP_NOT_APPROVED" = "Mojang が Yumu のサインインをまだ承認していません。承認されるまで Microsoft アカウントではサインインできません。";
+"error.AUTH_FAILED" = "サインインに失敗しました：{detail}。";
+"error.AUTH_NO_GAME" = "このアカウントは Minecraft: Java Edition を所有していません。";
+"error.AUTH_NO_XBOX_ACCOUNT" = "この Microsoft アカウントには Xbox プロフィールがありません。xbox.com に一度サインインすると作成されます。";
 "error.CANCELLED" = "操作はキャンセルされました。";
 "error.DOWNLOAD_HASH_MISMATCH" = "ダウンロードしたファイルが破損しています。再試行します。";
 "error.DOWNLOAD_HOST_NOT_ALLOWED" = "{url} からのダウンロードは許可されていないため中止しました。";
@@ -34,6 +57,7 @@
 "error.INVALID_TOML" = "ファイル {path} の形式が正しくありません。";
 "error.IO" = "{path} を読み書きできません。";
 "error.JAVA_UNAVAILABLE" = "このコンピュータで使える Java ランタイムがありません。";
+"error.LOADER_INSTALL_FAILED" = "Mod ローダーのインストールが {step} の手順で失敗しました。";
 "error.MALFORMED_DATA" = "予期しないデータ：{detail}。";
 "error.MOD_NOT_COMPATIBLE" = "この Mod には {gameVersion} の {loader} で動くバージョンがありません。";
 "error.NO_HOME_DIRECTORY" = "ホームフォルダが見つかりません。";
@@ -51,6 +75,8 @@
 "instances.new" = "新規インスタンス";
 "instances.title" = "インスタンス";
 "loader.fabric" = "Fabric";
+"loader.forge" = "Forge";
+"loader.neoforge" = "NeoForge";
 "loader.quilt" = "Quilt";
 "loader.vanilla" = "バニラ";
 "mods.downloads" = "%@ ダウンロード";
@@ -69,6 +95,10 @@
 "new.name" = "名前";
 "new.title" = "新規インスタンス";
 "new.version" = "バージョン";
+"packs.browse" = "Modpack を探す";
+"packs.hint" = "インストールすると新しいインスタンスが作られ、必要なものはすべて自動で揃います。";
+"packs.install" = "インストール";
+"packs.search.placeholder" = "Modrinth の Modpack を検索…";
 "resources.add" = "追加…";
 "resources.empty" = "まだ何もありません。";
 "resources.resourcePacks" = "リソースパック";

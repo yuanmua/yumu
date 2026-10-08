@@ -6,7 +6,7 @@ struct NewInstanceSheet: View {
     @State private var name = ""
     @State private var version = ""
     @State private var loader = "vanilla"
-    private static let loaders = ["vanilla", "fabric", "quilt"]
+    private static let loaders = ["vanilla", "fabric", "quilt", "forge", "neoforge"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: Bark.Space.lg) {

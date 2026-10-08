@@ -8,7 +8,7 @@ Yumu 是一个简洁、轻量、跨平台的 Minecraft 启动器。核心用 Rus
 - 一键导入整合包，管理 Mod、光影、资源包
 - 界面美观，动画流畅，操作傻瓜式
 
-> 当前阶段：macOS 应用可新建原版 / Fabric / Quilt 实例，搜索安装 Modrinth 模组，导入 `.mrpack` 整合包，管理光影与资源包；阶段 2（本机发现与账号）进行中。
+> 当前阶段：macOS 应用支持微软账号登录，可新建原版 / Fabric / Quilt / Forge / NeoForge 实例，从 Modrinth 搜索安装模组、光影、资源包与整合包，导入 `.mrpack`；本机存档发现与 Mojang API 接入申请待做。
 
 ## 命名
 

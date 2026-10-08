@@ -7,7 +7,7 @@ use std::time::Instant;
 use heartwood::download::Progress;
 use heartwood::mojang::fetch_manifest;
 use heartwood::resource::Kind;
-use heartwood::{Error, Result, account, install, launch, loader, modpack, mods, resource};
+use heartwood::{Error, Result, account, auth, install, launch, loader, modpack, mods, resource};
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
@@ -18,9 +18,13 @@ const ASYNC_METHODS: &[&str] = &[
     "version.listGame",
     "version.listLoader",
     "instance.launch",
+    "account.beginMicrosoftLogin",
     "mod.search",
     "mod.install",
+    "resource.install",
+    "modpack.search",
     "modpack.import",
+    "modpack.installModrinth",
 ];
 
 #[derive(Deserialize)]
@@ -44,7 +48,12 @@ struct CreateParams {
 #[serde(rename_all = "camelCase")]
 struct LaunchParams {
     id: String,
-    player_name: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NameParams {
+    name: String,
 }
 
 #[derive(Deserialize, Default)]
@@ -63,11 +72,24 @@ struct LoaderVersionParams {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct SearchParams {
-    id: String,
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(default = "default_project_type")]
+    project_type: String,
     #[serde(default)]
     query: String,
     #[serde(default)]
     offset: u32,
+}
+
+fn default_project_type() -> String {
+    "mod".to_owned()
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ProjectParams {
+    project_id: String,
 }
 
 #[derive(Deserialize)]
@@ -97,6 +119,8 @@ struct ResourceParams {
     enabled: bool,
     #[serde(default)]
     path: PathBuf,
+    #[serde(default)]
+    project_id: String,
 }
 
 #[derive(Deserialize)]
@@ -154,8 +178,32 @@ pub(crate) async fn call(core: &Core, method: &str, params: Value) -> Result<Val
             );
             Ok(json!({}))
         }
-        _ => call_files(core, method, params).await,
+        _ => call_accounts(core, method, params).await,
     }
+}
+
+/// Synchronous account methods. Offline accounts follow Prism's rule: only alongside a Microsoft one.
+async fn call_accounts(core: &Core, method: &str, params: Value) -> Result<Value> {
+    let mut accounts = core.store.load_accounts().await?;
+    match method {
+        "account.list" => {
+            return Ok(json!(accounts
+                .accounts
+                .iter()
+                .map(|a| json!({ "id": a.id, "kind": a.kind, "name": a.name, "uuid": a.uuid, "active": a.id == accounts.active }))
+                .collect::<Vec<_>>()));
+        }
+        "account.addOffline" => {
+            let params: NameParams = parse(params)?;
+            accounts.add_offline(params.name.trim())?;
+        }
+        "account.remove" => accounts.remove(&parse::<IdParams>(params)?.id)?,
+        "account.setActive" => accounts.set_active(&parse::<IdParams>(params)?.id)?,
+        _ => return call_files(core, method, params).await,
+    }
+    core.store.save_accounts(&accounts).await?;
+    core.emit("account.changed", json!({ "active": accounts.active }));
+    Ok(json!({ "active": accounts.active }))
 }
 
 /// Synchronous methods that only touch files inside an instance.
@@ -264,18 +312,88 @@ pub(crate) async fn start(
             ))
         }
         "instance.launch" => launch_instance(core, parse(params)?, progress).await,
-        "mod.search" => {
+        "account.beginMicrosoftLogin" => {
+            let device = auth::begin_device_code(&core.downloader).await?;
+            core.emit(
+                "account.loginCode",
+                json!({ "userCode": device.user_code, "verificationUri": device.verification_uri }),
+            );
+            let signed = auth::finish_device_code(&core.downloader, &device).await?;
+            let added = account::from_signed(signed);
+            let mut accounts = core.store.load_accounts().await?;
+            accounts.upsert(added.clone());
+            core.store.save_accounts(&accounts).await?;
+            core.emit("account.changed", json!({}));
+            Ok(json!({ "id": added.id, "name": added.name }))
+        }
+        _ => start_content(core, method, params, progress).await,
+    }
+}
+
+/// Asynchronous methods about mods, resources and modpacks.
+async fn start_content(
+    core: &Arc<Core>,
+    method: &str,
+    params: Value,
+    progress: &Arc<Progress>,
+) -> Result<Value> {
+    match method {
+        "mod.search" | "modpack.search" => {
             let params: SearchParams = parse(params)?;
-            let instance = core.store.load(&params.id).await?;
+            let project_type = if method == "modpack.search" {
+                "modpack"
+            } else {
+                params.project_type.as_str()
+            };
+            let instance = match &params.id {
+                Some(id) => Some(core.store.load(id).await?),
+                None => None,
+            };
             let result = mods::search(
                 &core.downloader,
+                project_type,
                 &params.query,
-                &instance.game.version,
-                &instance.loader.kind,
+                instance.as_ref().map(|i| i.game.version.as_str()),
+                instance.as_ref().map(|i| i.loader.kind.as_str()),
                 params.offset,
             )
             .await?;
             to_value(&result)
+        }
+        "resource.install" => {
+            let params: ResourceParams = parse(params)?;
+            let instance = core.store.load(&params.id).await?;
+            let dir = core
+                .store
+                .game_dir(&params.id)
+                .join(Kind::parse(&params.kind)?.dir_name());
+            tokio::fs::create_dir_all(&dir)
+                .await
+                .map_err(|source| Error::Io {
+                    path: dir.clone(),
+                    source,
+                })?;
+            let file_name = mods::install_file(
+                &core.downloader,
+                &dir,
+                &params.project_id,
+                Some(&instance.game.version),
+                progress,
+            )
+            .await?;
+            Ok(json!({ "fileName": file_name }))
+        }
+        "modpack.installModrinth" => {
+            let params: ProjectParams = parse(params)?;
+            let id = modpack::import_from_modrinth(
+                &core.store,
+                &core.downloader,
+                &params.project_id,
+                progress,
+            )
+            .await?;
+            core.emit("instance.changed", json!({ "id": id, "change": "created" }));
+            Ok(json!({ "id": id }))
         }
         "mod.install" => {
             let params: ModInstallParams = parse(params)?;
@@ -342,10 +460,10 @@ async fn launch_instance(
 ) -> Result<Value> {
     let id = params.id;
     let mut instance = core.store.load(&id).await?;
+    let session = account::active_session(&core.store, &core.downloader).await?;
     let prepared =
         install::install(&core.store, &core.downloader, &id, &mut instance, progress).await?;
-    let account = account::offline(&params.player_name);
-    let launched = launch::launch(&core.store, &id, &mut instance, &prepared, &account).await?;
+    let launched = launch::launch(&core.store, &id, &mut instance, &prepared, &session).await?;
     let pid = launched.child.id().unwrap_or(0);
     lock(&core.running).insert(id.clone(), pid);
     core.emit("game.started", json!({ "instanceId": id, "pid": pid }));
@@ -401,9 +519,14 @@ fn args(error: &Error) -> Value {
             json!({ "path": path, "expected": expected, "actual": actual })
         }
         Error::Json { from, .. } => json!({ "from": from }),
-        Error::Malformed(detail) | Error::InvalidRequest(detail) => json!({ "detail": detail }),
+        Error::Malformed(detail) | Error::InvalidRequest(detail) | Error::AuthFailed(detail) => {
+            json!({ "detail": detail })
+        }
+        Error::LoaderInstallFailed { step, detail } => json!({ "step": step, "detail": detail }),
         Error::VersionNotFound(version) => json!({ "version": version }),
-        Error::InstanceNotFound(id) | Error::InstanceExists(id) => json!({ "id": id }),
+        Error::InstanceNotFound(id) | Error::InstanceExists(id) | Error::AccountNotFound(id) => {
+            json!({ "id": id })
+        }
         Error::EditionUnsupported(edition) => json!({ "edition": edition }),
         Error::JavaUnavailable { component } => json!({ "component": component }),
         Error::Unsupported(what) => json!({ "what": what }),

@@ -2,6 +2,10 @@
 
 ## 未发布
 
+- 新增方法：`account.list`、`account.addOffline`、`account.remove`、`account.setActive`、`account.beginMicrosoftLogin`、`resource.install`、`modpack.search`、`modpack.installModrinth`。`mod.search` 新增 `projectType`，`id` 变为可选。`instance.launch` 不再接受 `playerName`，改用当前账号。
+- 新增事件：`account.loginCode`、`account.changed`。
+- 新增错误 kind：`AUTH_FAILED`、`AUTH_NO_XBOX_ACCOUNT`、`AUTH_NO_GAME`、`AUTH_APP_NOT_APPROVED`、`ACCOUNT_REQUIRED`、`ACCOUNT_NOT_FOUND`、`ACCOUNT_OFFLINE_REQUIRES_MICROSOFT`、`LOADER_INSTALL_FAILED`。
+
 - 新增方法：`version.listLoader`、`mod.listInstalled`、`mod.toggle`、`mod.remove`、`mod.search`、`mod.install`、`resource.list`、`resource.add`、`resource.remove`、`resource.toggle`、`modpack.inspect`、`modpack.import`。
 - `instance.create` 新增可选参数 `loaderKind`、`loaderVersion`；`instance.list` 结果新增 `loaderVersion`。
 - 新增错误 kind：`DOWNLOAD_HOST_NOT_ALLOWED`、`MOD_NOT_COMPATIBLE`、`INVALID_FILE_NAME`。

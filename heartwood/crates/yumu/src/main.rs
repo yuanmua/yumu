@@ -6,7 +6,7 @@ use anyhow::Context;
 use clap::{Parser, Subcommand};
 use heartwood::download::{Downloader, Progress};
 use heartwood::instance::{Store, slug};
-use heartwood::{Error, account, install, launch, modpack, mods, mojang};
+use heartwood::{Error, account, auth, install, launch, modpack, mods, mojang};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -33,9 +33,6 @@ enum Command {
         /// Mod loader for a new instance: vanilla, fabric or quilt
         #[arg(long, default_value = "vanilla")]
         loader: String,
-        /// Offline player name
-        #[arg(long, default_value = "Player")]
-        player: String,
         /// Return immediately instead of waiting for the game to exit
         #[arg(long)]
         detach: bool,
@@ -61,6 +58,25 @@ enum Command {
         #[command(subcommand)]
         command: ModpackCommand,
     },
+    /// Manage accounts
+    Account {
+        #[command(subcommand)]
+        command: AccountCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum AccountCommand {
+    /// List accounts
+    List,
+    /// Sign in with a Microsoft account
+    Login,
+    /// Add an offline account (requires a Microsoft account first)
+    Offline { name: String },
+    /// Make an account active
+    Use { id: String },
+    /// Remove an account
+    Remove { id: String },
 }
 
 #[derive(Subcommand)]
@@ -87,6 +103,16 @@ enum ModpackCommand {
 enum InstanceCommand {
     /// List instances
     List,
+    /// Create an instance without starting it
+    Create {
+        name: String,
+        #[arg(long)]
+        version: String,
+        #[arg(long, default_value = "vanilla")]
+        loader: String,
+    },
+    /// Download everything an instance needs without starting it
+    Install { name: String },
 }
 
 #[tokio::main]
@@ -113,17 +139,9 @@ async fn main() -> anyhow::Result<()> {
             version,
             name,
             loader,
-            player,
             detach,
-        } => play(&store, &downloader, version, name, &loader, &player, detach).await,
-        Command::Instance {
-            command: InstanceCommand::List,
-        } => {
-            for (id, instance) in store.list().await? {
-                println!("{id}\t{}\t{}", instance.game.version, instance.name);
-            }
-            Ok(())
-        }
+        } => play(&store, &downloader, version, name, &loader, detach).await,
+        Command::Instance { command } => run_instance(&store, &downloader, command).await,
         Command::Version { snapshots } => {
             let manifest = mojang::fetch_manifest(&downloader).await?;
             for version in manifest
@@ -136,6 +154,7 @@ async fn main() -> anyhow::Result<()> {
             Ok(())
         }
         Command::Mod { command } => run_mod(&store, &downloader, command).await,
+        Command::Account { command } => run_account(&store, &downloader, command).await,
         Command::Modpack {
             command: ModpackCommand::Import { path, name },
         } => {
@@ -149,6 +168,93 @@ async fn main() -> anyhow::Result<()> {
             Ok(())
         }
     }
+}
+
+async fn run_instance(
+    store: &Store,
+    downloader: &Downloader,
+    command: InstanceCommand,
+) -> anyhow::Result<()> {
+    match command {
+        InstanceCommand::List => {
+            for (id, instance) in store.list().await? {
+                println!(
+                    "{id}\t{}\t{}\t{}",
+                    instance.game.version, instance.loader.kind, instance.name
+                );
+            }
+        }
+        InstanceCommand::Create {
+            name,
+            version,
+            loader,
+        } => {
+            let id = store.create(&name, &version).await?;
+            if loader != heartwood::loader::VANILLA {
+                let mut created = store.load(&id).await?;
+                created.loader.kind = loader;
+                store.save(&id, &created).await?;
+            }
+            println!("Created {id}");
+        }
+        InstanceCommand::Install { name } => {
+            let id = slug(&name);
+            let mut instance = store.load(&id).await?;
+            let progress = Arc::new(Progress::default());
+            let reporter = tokio::spawn(report(Arc::clone(&progress)));
+            let result = install::install(store, downloader, &id, &mut instance, &progress).await;
+            reporter.abort();
+            println!();
+            let prepared = result.context("installation failed")?;
+            println!(
+                "Ready: {} with {} classpath entries",
+                prepared.version.id,
+                prepared.classpath.len()
+            );
+        }
+    }
+    Ok(())
+}
+
+async fn run_account(
+    store: &Store,
+    downloader: &Downloader,
+    command: AccountCommand,
+) -> anyhow::Result<()> {
+    let mut accounts = store.load_accounts().await?;
+    match command {
+        AccountCommand::List => {
+            for account in &accounts.accounts {
+                let marker = if account.id == accounts.active {
+                    "*"
+                } else {
+                    " "
+                };
+                println!(
+                    "{marker} {}\t{}\t{}\t{}",
+                    account.kind, account.name, account.uuid, account.id
+                );
+            }
+            return Ok(());
+        }
+        AccountCommand::Login => {
+            let code = auth::begin_device_code(downloader).await?;
+            println!(
+                "Open {} and enter the code {}",
+                code.verification_uri, code.user_code
+            );
+            let signed = auth::finish_device_code(downloader, &code).await?;
+            println!("Signed in as {}", signed.name);
+            accounts.upsert(account::from_signed(signed));
+        }
+        AccountCommand::Offline { name } => {
+            accounts.add_offline(&name)?;
+        }
+        AccountCommand::Use { id } => accounts.set_active(&id)?,
+        AccountCommand::Remove { id } => accounts.remove(&id)?,
+    }
+    store.save_accounts(&accounts).await?;
+    Ok(())
 }
 
 async fn run_mod(
@@ -175,9 +281,10 @@ async fn run_mod(
             let target = store.load(&slug(&instance)).await?;
             let result = mods::search(
                 downloader,
+                "mod",
                 &query,
-                &target.game.version,
-                &target.loader.kind,
+                Some(&target.game.version),
+                Some(&target.loader.kind),
                 0,
             )
             .await?;
@@ -220,7 +327,6 @@ async fn play(
     version: Option<String>,
     name: Option<String>,
     loader: &str,
-    player: &str,
     detach: bool,
 ) -> anyhow::Result<()> {
     let (name, version) = match (name, version) {
@@ -247,6 +353,9 @@ async fn play(
     };
     println!("Instance: {} ({})", instance.name, instance.game.version);
 
+    let session = account::active_session(store, downloader)
+        .await
+        .context("run `yumu account login` first")?;
     let progress = Arc::new(Progress::default());
     let reporter = tokio::spawn(report(Arc::clone(&progress)));
     let prepared = install::install(store, downloader, &id, &mut instance, &progress).await;
@@ -254,8 +363,7 @@ async fn play(
     println!();
     let prepared = prepared.context("installation failed")?;
 
-    let account = account::offline(player);
-    let launched = launch::launch(store, &id, &mut instance, &prepared, &account).await?;
+    let launched = launch::launch(store, &id, &mut instance, &prepared, &session).await?;
     println!(
         "Game started (pid {}). Log: {}",
         launched.child.id().unwrap_or_default(),

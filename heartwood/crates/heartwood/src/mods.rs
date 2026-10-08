@@ -94,19 +94,25 @@ pub struct LocalMod {
     pub record: Option<ModRecord>,
 }
 
+/// Search Modrinth. `project_type` is `mod`, `modpack`, `resourcepack` or `shader`; the loader
+/// facet only makes sense for mods and modpacks, the game version facet for everything but modpacks
+/// when none is given.
 pub async fn search(
     downloader: &Downloader,
+    project_type: &str,
     query: &str,
-    game_version: &str,
-    loader: &str,
+    game_version: Option<&str>,
+    loader: Option<&str>,
     offset: u32,
 ) -> Result<SearchResult> {
-    let facets = json!([
-        ["project_type:mod"],
-        [format!("versions:{game_version}")],
-        [format!("categories:{loader}")]
-    ])
-    .to_string();
+    let mut facets = vec![vec![format!("project_type:{project_type}")]];
+    if let Some(game_version) = game_version {
+        facets.push(vec![format!("versions:{game_version}")]);
+    }
+    if let Some(loader) = loader.filter(|_| project_type == "mod" || project_type == "modpack") {
+        facets.push(vec![format!("categories:{loader}")]);
+    }
+    let facets = json!(facets).to_string();
     let url = reqwest::Url::parse_with_params(
         &format!("{API}/search"),
         [
@@ -128,22 +134,68 @@ pub async fn search(
     downloader.get_json(url.as_str()).await
 }
 
-/// Versions of a project compatible with the instance, newest first.
+/// Versions of a project, newest first, optionally narrowed to a game version and loader.
 pub async fn versions(
     downloader: &Downloader,
     project_id: &str,
-    game_version: &str,
-    loader: &str,
+    game_version: Option<&str>,
+    loader: Option<&str>,
 ) -> Result<Vec<Version>> {
-    let url = reqwest::Url::parse_with_params(
-        &format!("{API}/project/{project_id}/version"),
-        [
-            ("loaders", json!([loader]).to_string()),
-            ("game_versions", json!([game_version]).to_string()),
-        ],
-    )
-    .map_err(|error| Error::Malformed(error.to_string()))?;
+    let mut params = Vec::new();
+    if let Some(loader) = loader {
+        params.push(("loaders", json!([loader]).to_string()));
+    }
+    if let Some(game_version) = game_version {
+        params.push(("game_versions", json!([game_version]).to_string()));
+    }
+    let url =
+        reqwest::Url::parse_with_params(&format!("{API}/project/{project_id}/version"), params)
+            .map_err(|error| Error::Malformed(error.to_string()))?;
     downloader.get_json(url.as_str()).await
+}
+
+/// The primary file of a version, checked against Modrinth's CDN and our file name rules.
+pub fn primary_file(version: &Version) -> Result<&VersionFile> {
+    let file = version
+        .files
+        .iter()
+        .find(|file| file.primary)
+        .or(version.files.first())
+        .ok_or_else(|| Error::Malformed(format!("version {} has no files", version.id)))?;
+    Downloader::check_host(&file.url, MODRINTH_HOSTS)?;
+    crate::resource::validate_file_name(&file.filename)?;
+    Ok(file)
+}
+
+/// Download the newest compatible version of a project into `dir` (shader packs, resource packs,
+/// modpack archives). Returns the file name.
+pub async fn install_file(
+    downloader: &Downloader,
+    dir: &Path,
+    project_id: &str,
+    game_version: Option<&str>,
+    progress: &Arc<Progress>,
+) -> Result<String> {
+    let version = versions(downloader, project_id, game_version, None)
+        .await?
+        .into_iter()
+        .next()
+        .ok_or_else(|| Error::ModNotCompatible {
+            project: project_id.to_owned(),
+            game_version: game_version.unwrap_or("*").to_owned(),
+            loader: "*".to_owned(),
+        })?;
+    let file = primary_file(&version)?;
+    progress.add_total(file.size);
+    let request = Download {
+        url: file.url.clone(),
+        path: dir.join(&file.filename),
+        sha1: Some(file.hashes.sha1.clone()),
+        size: Some(file.size),
+        executable: false,
+    };
+    downloader.fetch(&request, progress).await?;
+    Ok(file.filename.clone())
 }
 
 /// Install a project and its required dependencies. Returns what was added.
@@ -169,7 +221,7 @@ pub async fn install(
         if present.contains(&id) || planned.iter().any(|version| version.project_id == id) {
             continue;
         }
-        let version = versions(downloader, &id, game_version, loader)
+        let version = versions(downloader, &id, Some(game_version), Some(loader))
             .await?
             .into_iter()
             .next()
@@ -207,14 +259,7 @@ pub async fn install(
     let mut downloads = Vec::new();
     let mut installed = Vec::new();
     for version in &planned {
-        let file = version
-            .files
-            .iter()
-            .find(|file| file.primary)
-            .or(version.files.first())
-            .ok_or_else(|| Error::Malformed(format!("version {} has no files", version.id)))?;
-        Downloader::check_host(&file.url, MODRINTH_HOSTS)?;
-        crate::resource::validate_file_name(&file.filename)?;
+        let file = primary_file(version)?;
         progress.add_total(file.size);
         downloads.push(Download {
             url: file.url.clone(),

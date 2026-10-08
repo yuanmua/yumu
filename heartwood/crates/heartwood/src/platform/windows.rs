@@ -45,6 +45,11 @@ pub fn set_executable(_path: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+/// The data directory lives under the user's profile, which is already private on Windows.
+pub fn restrict_permissions(_path: &Path) -> std::io::Result<()> {
+    Ok(())
+}
+
 pub fn symlink(_target: &str, _link: &Path) -> std::io::Result<()> {
     Ok(())
 }

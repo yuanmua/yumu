@@ -5,6 +5,7 @@ struct ResourcesView: View {
     @Environment(AppModel.self) private var model
     let instance: InstanceSummary
     @State private var adding: ResourceKind?
+    @State private var queries: [ResourceKind: String] = [:]
 
     var body: some View {
         HStack(alignment: .top, spacing: Bark.Space.xl) {
@@ -26,6 +27,7 @@ struct ResourcesView: View {
 
     private func section(_ kind: ResourceKind) -> some View {
         let files = model.resources[kind] ?? []
+        let scope = SearchScope.resources(instance.id, kind)
         return VStack(alignment: .leading, spacing: Bark.Space.sm) {
             HStack {
                 Text(L(kind.titleKey)).font(.headline)
@@ -33,7 +35,7 @@ struct ResourcesView: View {
                 Button(L("resources.add")) { adding = kind }.controlSize(.small)
             }
             if files.isEmpty {
-                Text(L("resources.empty")).foregroundStyle(.secondary).frame(maxHeight: .infinity, alignment: .top)
+                Text(L("resources.empty")).foregroundStyle(.secondary)
             } else {
                 List(files) { file in
                     HStack {
@@ -57,6 +59,20 @@ struct ResourcesView: View {
                 }
                 .listStyle(.inset)
                 .clipShape(RoundedRectangle(cornerRadius: Bark.Radius.md, style: .continuous))
+                .frame(maxHeight: 220)
+            }
+            SearchField(
+                scope: scope,
+                query: Binding(get: { queries[kind] ?? "" }, set: { queries[kind] = $0 }),
+                placeholderKey: "mods.search.placeholder"
+            )
+            SearchResults(scope: scope, emptyKey: "mods.noResults") { hit in
+                if model.installingProjects.contains(hit.projectId) {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Button(L("mods.install")) { model.installResource(instance.id, kind: kind, projectId: hit.projectId) }
+                        .controlSize(.small)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

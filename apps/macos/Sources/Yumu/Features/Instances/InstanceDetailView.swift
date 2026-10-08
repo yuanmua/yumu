@@ -11,8 +11,6 @@ struct InstanceDetailView: View {
     @Environment(AppModel.self) private var model
     let instance: InstanceSummary
     @State private var tab = DetailTab.overview
-    // Stop-gap until account.* lands: offline name is a pure interface preference for now.
-    @AppStorage("offlinePlayerName") private var playerName = "Player"
 
     private var activity: Activity? { model.activity[instance.id] }
 
@@ -68,18 +66,16 @@ struct InstanceDetailView: View {
         HStack(alignment: .bottom) {
             status
             Spacer()
-            TextField(L("detail.playerName"), text: $playerName)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 160)
             Button {
-                model.play(instance.id, playerName: playerName)
+                model.play(instance.id)
             } label: {
                 Label(L("detail.play"), systemImage: "play.fill")
                     .frame(minWidth: 120)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.extraLarge)
-            .disabled(activity != nil || playerName.trimmingCharacters(in: .whitespaces).isEmpty)
+            .disabled(activity != nil || model.activeAccount == nil)
+            .help(model.activeAccount == nil ? L("error.ACCOUNT_REQUIRED") : "")
         }
     }
 

@@ -98,6 +98,62 @@ impl Downloader {
         .await
     }
 
+    /// POST a form and return status with body; OAuth endpoints answer errors with a 4xx and a JSON body.
+    pub async fn post_form(&self, url: &str, form: &[(&str, &str)]) -> Result<(u16, String)> {
+        retry(|| async {
+            let response = self
+                .client
+                .post(url)
+                .form(form)
+                .send()
+                .await
+                .map_err(http(url))?;
+            let status = response.status().as_u16();
+            Ok((status, response.text().await.map_err(http(url))?))
+        })
+        .await
+    }
+
+    /// POST a JSON body (optionally with a bearer token) and return status with body.
+    pub async fn post_json(
+        &self,
+        url: &str,
+        body: &serde_json::Value,
+        bearer: Option<&str>,
+    ) -> Result<(u16, String)> {
+        let body = body.to_string();
+        retry(|| async {
+            let mut request = self
+                .client
+                .post(url)
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/json")
+                .body(body.clone());
+            if let Some(token) = bearer {
+                request = request.bearer_auth(token);
+            }
+            let response = request.send().await.map_err(http(url))?;
+            let status = response.status().as_u16();
+            Ok((status, response.text().await.map_err(http(url))?))
+        })
+        .await
+    }
+
+    pub async fn get_with_bearer(&self, url: &str, bearer: &str) -> Result<(u16, String)> {
+        retry(|| async {
+            let response = self
+                .client
+                .get(url)
+                .bearer_auth(bearer)
+                .send()
+                .await
+                .map_err(http(url))?;
+            let status = response.status().as_u16();
+            Ok((status, response.text().await.map_err(http(url))?))
+        })
+        .await
+    }
+
     /// Reject a download URL whose host is not in `allowed`. Keeps us inside each platform's terms.
     pub fn check_host(url: &str, allowed: &[&str]) -> Result<()> {
         let host = reqwest::Url::parse(url)
@@ -199,11 +255,19 @@ impl Downloader {
     }
 }
 
+/// A file counts as present when it exists with the expected size. Hashing every cached file on
+/// each launch would read gigabytes for nothing; freshly downloaded files are verified inline, and
+/// `verify` re-checks everything when the user asks for a repair.
 async fn is_complete(download: &Download) -> Result<bool> {
     let Ok(metadata) = tokio::fs::metadata(&download.path).await else {
         return Ok(false);
     };
-    if download.size.is_some_and(|size| size != metadata.len()) {
+    Ok(metadata.is_file() && download.size.is_none_or(|size| size == metadata.len()))
+}
+
+/// Full hash check of an existing file; used by repair, never on the normal launch path.
+pub async fn verify(download: &Download) -> Result<bool> {
+    if !is_complete(download).await? {
         return Ok(false);
     }
     match &download.sha1 {

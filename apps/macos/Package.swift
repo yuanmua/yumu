@@ -17,6 +17,9 @@ let package = Package(
                 .unsafeFlags(["-L", ".build/grain"]),
                 .linkedLibrary("grain"),
                 .linkedLibrary("iconv"),
+                // reqwest reads the macOS system proxy through SystemConfiguration.
+                .linkedFramework("SystemConfiguration"),
+                .linkedFramework("CoreFoundation"),
             ]
         ),
     ]

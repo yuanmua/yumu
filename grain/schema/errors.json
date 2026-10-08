@@ -110,6 +110,37 @@
       "args": [
         "name"
       ]
+    },
+    "AUTH_FAILED": {
+      "args": [
+        "detail"
+      ]
+    },
+    "AUTH_NO_XBOX_ACCOUNT": {
+      "args": []
+    },
+    "AUTH_NO_GAME": {
+      "args": []
+    },
+    "AUTH_APP_NOT_APPROVED": {
+      "args": []
+    },
+    "ACCOUNT_REQUIRED": {
+      "args": []
+    },
+    "ACCOUNT_NOT_FOUND": {
+      "args": [
+        "id"
+      ]
+    },
+    "ACCOUNT_OFFLINE_REQUIRES_MICROSOFT": {
+      "args": []
+    },
+    "LOADER_INSTALL_FAILED": {
+      "args": [
+        "step",
+        "detail"
+      ]
     }
   }
 }

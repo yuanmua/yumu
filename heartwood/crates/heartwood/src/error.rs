@@ -55,6 +55,22 @@ pub enum Error {
     },
     #[error("invalid file name {0}")]
     InvalidFileName(String),
+    #[error("sign-in failed: {0}")]
+    AuthFailed(String),
+    #[error("mod loader installer step {step} failed: {detail}")]
+    LoaderInstallFailed { step: String, detail: String },
+    #[error("this Microsoft account has no Xbox profile")]
+    AuthNoXbox,
+    #[error("this account does not own Minecraft: Java Edition")]
+    AuthNoGame,
+    #[error("Mojang has not approved this launcher's client id yet")]
+    AuthNotApproved,
+    #[error("no account selected")]
+    AccountRequired,
+    #[error("account {0} not found")]
+    AccountNotFound(String),
+    #[error("offline accounts require a Microsoft account first")]
+    OfflineRequiresMicrosoft,
     #[error("entry {0} escapes its target directory")]
     PathTraversal(String),
     #[error("zip error: {0}")]
@@ -93,6 +109,14 @@ impl Error {
             Self::HostNotAllowed { .. } => "DOWNLOAD_HOST_NOT_ALLOWED",
             Self::ModNotCompatible { .. } => "MOD_NOT_COMPATIBLE",
             Self::InvalidFileName(_) => "INVALID_FILE_NAME",
+            Self::AuthFailed(_) => "AUTH_FAILED",
+            Self::LoaderInstallFailed { .. } => "LOADER_INSTALL_FAILED",
+            Self::AuthNoXbox => "AUTH_NO_XBOX_ACCOUNT",
+            Self::AuthNoGame => "AUTH_NO_GAME",
+            Self::AuthNotApproved => "AUTH_APP_NOT_APPROVED",
+            Self::AccountRequired => "ACCOUNT_REQUIRED",
+            Self::AccountNotFound(_) => "ACCOUNT_NOT_FOUND",
+            Self::OfflineRequiresMicrosoft => "ACCOUNT_OFFLINE_REQUIRES_MICROSOFT",
             Self::PathTraversal(_) => "PATH_TRAVERSAL",
             Self::Zip(_) => "ZIP",
             Self::Join(_) | Self::Cancelled => "CANCELLED",

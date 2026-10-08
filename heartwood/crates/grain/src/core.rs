@@ -36,6 +36,7 @@ pub struct Core {
 
 impl Core {
     pub fn new(config: Config, events: EventSink) -> Result<Self> {
+        init_logging();
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .enable_all()
@@ -121,6 +122,26 @@ async fn report(core: Arc<Core>, task_id: String, progress: Arc<Progress>) {
             );
         }
     }
+}
+
+/// Write core logs to the platform log directory, keeping the previous run as `heartwood.1.log`.
+fn init_logging() {
+    let Ok(dir) = heartwood::platform::log_dir() else {
+        return;
+    };
+    if std::fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    let current = dir.join("heartwood.log");
+    let _ = std::fs::rename(&current, dir.join("heartwood.1.log"));
+    let Ok(file) = std::fs::File::create(&current) else {
+        return;
+    };
+    let _ = tracing_subscriber::fmt()
+        .with_writer(Arc::new(file))
+        .with_ansi(false)
+        .with_max_level(tracing::Level::INFO)
+        .try_init();
 }
 
 pub(crate) fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {

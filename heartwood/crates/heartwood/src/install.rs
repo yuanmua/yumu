@@ -12,7 +12,7 @@ use crate::mojang::{
 };
 use crate::mojang::{VERSION_MANIFEST_URL, fetch_manifest};
 use crate::rules::{Features, allows};
-use crate::{java, loader, platform};
+use crate::{forge, java, loader, platform};
 
 /// Everything `launch` needs, all present on disk.
 pub struct Prepared {
@@ -34,7 +34,7 @@ pub async fn install(
 ) -> Result<Prepared> {
     let cache = store.cache_dir();
     let game_version = instance.game.version.clone();
-    let version = resolve_version(store, downloader, id, instance, &cache).await?;
+    let (version, installer) = resolve_version(store, downloader, id, instance, &cache).await?;
     let asset_index = version
         .asset_index
         .clone()
@@ -54,42 +54,15 @@ pub async fn install(
     let java = java::ensure_runtime(downloader, &cache, component, progress).await?;
 
     let libraries_dir = cache.join("libraries");
-    let mut downloads = Vec::new();
-    let mut classpath = Vec::new();
-    let mut natives = Vec::new();
-    for library in &version.libraries {
-        if !allows(&library.rules, Features::default()) {
-            continue;
-        }
-        if let Some(artifact) = library_artifact(library)? {
-            let path = libraries_dir.join(&artifact.path);
-            classpath.push(path.clone());
-            progress.add_total(artifact.size.unwrap_or(0));
-            downloads.push(Download {
-                url: artifact.url,
-                path,
-                sha1: artifact.sha1,
-                size: artifact.size,
-                executable: false,
-            });
-        }
-        if let Some(classifier) = native_classifier(library)
-            && let Some(artifact) = library
-                .downloads
-                .as_ref()
-                .and_then(|downloads| downloads.classifiers.get(&classifier))
-        {
-            let name = format!("{}:{classifier}", library.name);
-            let path = libraries_dir.join(relative_path(artifact, &name)?);
-            downloads.push(download(artifact, path.clone(), progress));
-            let exclude = library
-                .extract
-                .as_ref()
-                .map(|e| e.exclude.clone())
-                .unwrap_or_default();
-            natives.push((path, exclude));
-        }
-    }
+    let installer_libraries = installer
+        .as_ref()
+        .map(|(_, profile)| profile.libraries.as_slice())
+        .unwrap_or_default();
+    let Libraries {
+        mut downloads,
+        mut classpath,
+        natives,
+    } = collect_libraries(&version, installer_libraries, &libraries_dir, progress)?;
 
     let client_jar = cache
         .join("versions")
@@ -110,6 +83,30 @@ pub async fn install(
 
     downloader.fetch_all(downloads, progress).await?;
 
+    if let Some((version_file, profile)) = &installer {
+        let vanilla_jar = cache
+            .join("versions")
+            .join(&game_version)
+            .join(format!("{game_version}.jar"));
+        forge::process(
+            version_file,
+            profile,
+            &java,
+            &libraries_dir,
+            &vanilla_jar,
+            &game_version,
+        )
+        .await?;
+    }
+    for path in &classpath {
+        if !tokio::fs::try_exists(path).await.unwrap_or(false) {
+            return Err(Error::Malformed(format!(
+                "library {} is missing after install",
+                path.display()
+            )));
+        }
+    }
+
     let natives_dir = cache.join("natives").join(&version.id);
     tokio::fs::create_dir_all(&natives_dir)
         .await
@@ -128,6 +125,73 @@ pub async fn install(
         assets_dir,
         libraries_dir,
     })
+}
+
+struct Libraries {
+    downloads: Vec<Download>,
+    classpath: Vec<PathBuf>,
+    natives: Vec<(PathBuf, Vec<String>)>,
+}
+
+/// Queue the jars of the version and of the loader installer; only the version's own go on the classpath.
+fn collect_libraries(
+    version: &VersionJson,
+    installer_libraries: &[Library],
+    libraries_dir: &Path,
+    progress: &Progress,
+) -> Result<Libraries> {
+    let mut libraries = Libraries {
+        downloads: Vec::new(),
+        classpath: Vec::new(),
+        natives: Vec::new(),
+    };
+    let on_classpath = version.libraries.len();
+    for (index, library) in version
+        .libraries
+        .iter()
+        .chain(installer_libraries)
+        .enumerate()
+    {
+        if !allows(&library.rules, Features::default()) {
+            continue;
+        }
+        if let Some(artifact) = library_artifact(library)? {
+            let path = libraries_dir.join(&artifact.path);
+            if index < on_classpath {
+                libraries.classpath.push(path.clone());
+            }
+            // An empty URL means the installer produces the jar; it is checked after processing.
+            if !artifact.url.is_empty() {
+                progress.add_total(artifact.size.unwrap_or(0));
+                libraries.downloads.push(Download {
+                    url: artifact.url,
+                    path,
+                    sha1: artifact.sha1,
+                    size: artifact.size,
+                    executable: false,
+                });
+            }
+        }
+        if let Some(classifier) = native_classifier(library)
+            && let Some(artifact) = library
+                .downloads
+                .as_ref()
+                .and_then(|downloads| downloads.classifiers.get(&classifier))
+        {
+            let name = format!("{}:{classifier}", library.name);
+            let path = libraries_dir.join(relative_path(artifact, &name)?);
+            libraries
+                .downloads
+                .push(download(artifact, path.clone(), progress));
+            let exclude = library
+                .extract
+                .as_ref()
+                .map(|e| e.exclude.clone())
+                .unwrap_or_default();
+            libraries.natives.push((path, exclude));
+        }
+    }
+    Ok(libraries)
 }
 
 /// Download the asset index and queue every object it lists that is not yet in the cache.
@@ -173,13 +237,14 @@ async fn collect_assets(
 }
 
 /// The fully merged version JSON for an instance: vanilla, or a loader profile on top of vanilla.
+/// For Forge-like loaders also returns the installer profile that still has to be processed.
 async fn resolve_version(
     store: &Store,
     downloader: &Downloader,
     id: &str,
     instance: &mut Instance,
     cache: &Path,
-) -> Result<VersionJson> {
+) -> Result<(VersionJson, Option<(PathBuf, forge::InstallProfile)>)> {
     let game_version = instance.game.version.clone();
     let vanilla_file = cache
         .join("versions")
@@ -190,7 +255,7 @@ async fn resolve_version(
 
     let kind = instance.loader.kind.clone();
     if kind == loader::VANILLA {
-        return Ok(vanilla);
+        return Ok((vanilla, None));
     }
     if !loader::is_supported(&kind) {
         return Err(Error::Unsupported("this mod loader"));
@@ -209,7 +274,15 @@ async fn resolve_version(
     )
     .await?;
     let profile: VersionJson = read_json(&profile_file).await?;
-    Ok(VersionJson::merge(vanilla, profile))
+    let installer = if loader::is_forge_like(&kind) {
+        Some((
+            profile_file.clone(),
+            forge::load_profile(&profile_file).await?,
+        ))
+    } else {
+        None
+    };
+    Ok((VersionJson::merge(vanilla, profile), installer))
 }
 
 /// Fetch the version JSON by its manifest entry, falling back to a cached copy when offline.

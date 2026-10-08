@@ -41,16 +41,18 @@ const char* grain_api_version(void);                    // 接口版本，semver
 |---|---|---|---|
 | `grain` | `ping` | 同步 | 已实现 |
 | `instance` | `list`、`create {name, gameVersion, loaderKind?, loaderVersion?}`、`delete {id}` | 同步 | 已实现 |
-| `instance` | `launch {id, playerName}`：补齐缺失文件后启动，结果 `{pid}` | 异步 | 已实现 |
+| `instance` | `launch {id}`：用当前账号补齐缺失文件后启动，结果 `{pid}` | 异步 | 已实现 |
 | `version` | `listGame {snapshots?}` → `{latestRelease, versions:[{id,kind,releaseTime}]}` | 异步 | 已实现 |
 | `version` | `listLoader {gameVersion, loader}` → `[{version, stable}]` | 异步 | 已实现 |
 | `mod` | `listInstalled {id}` → `[LocalMod]`、`toggle {id, fileName, enabled}`、`remove {id, fileName}` | 同步 | 已实现 |
-| `mod` | `search {id, query, offset?}` → `{hits:[SearchHit], totalHits}`；`install {id, projectId}` → `[ModRecord]`（含自动装上的依赖） | 异步 | 已实现 |
+| `mod` | `search {id?, projectType?, query, offset?}` → `{hits:[SearchHit], totalHits}`，`projectType` 为 `mod`（默认）、`modpack`、`resourcepack`、`shader`；`install {id, projectId}` → `[ModRecord]`（含自动装上的依赖） | 异步 | 已实现 |
 | `resource` | `list {id, kind}` → `[{fileName, enabled, size}]`、`add {id, kind, path}`、`remove`、`toggle`；`kind` 为 `shaderpacks` 或 `resourcepacks` | 同步 | 已实现 |
+| `resource` | `install {id, kind, projectId}` → `{fileName}`，从 Modrinth 下载最新兼容版本 | 异步 | 已实现 |
 | `modpack` | `inspect {path}` → `{name, version, gameVersion, loaderKind, loaderVersion, fileCount}` | 同步 | 已实现 |
-| `modpack` | `import {path, name?}` → `{id}`，目前支持 `.mrpack` | 异步 | 已实现 |
+| `modpack` | `import {path, name?}` → `{id}`，目前支持 `.mrpack`；`search {query, offset?}`；`installModrinth {projectId}` → `{id}` | 异步 | 已实现 |
+| `account` | `list` → `[{id, kind, name, uuid, active}]`、`addOffline {name}`、`remove {id}`、`setActive {id}` | 同步 | 已实现 |
+| `account` | `beginMicrosoftLogin`：先推送 `account.loginCode`，用户在浏览器完成后结果 `{id, name}` | 异步 | 已实现 |
 | `instance` | `get`、`update`、`duplicate` | 同步 | 计划 |
-| `account` | `list`、`addOffline`、`remove`、`setActive`、`beginMicrosoftLogin` | 同步 / 异步 | 阶段 2 |
 | `discover` | `scan` | 异步 | 阶段 2 |
 | `settings` | `get`、`update` | 同步 | 计划 |
 
@@ -73,7 +75,8 @@ const char* grain_api_version(void);                    // 接口版本，semver
 | `instance.changed` | `{id, change}` |
 | `game.started` | `{instanceId, pid}` |
 | `game.exited` | `{instanceId, code, crashReportPath?}` |
-| `account.loginCode` | `{taskId, userCode, verificationUri}` |
+| `account.loginCode` | `{userCode, verificationUri}` |
+| `account.changed` | `{active}` |
 
 进度事件每个任务每 100 毫秒最多一条。
 

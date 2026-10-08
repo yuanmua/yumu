@@ -47,6 +47,12 @@ pub fn set_executable(path: &Path) -> std::io::Result<()> {
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))
 }
 
+/// Owner-only permissions for files holding tokens.
+pub fn restrict_permissions(path: &Path) -> std::io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+}
+
 pub fn symlink(target: &str, link: &Path) -> std::io::Result<()> {
     std::os::unix::fs::symlink(target, link)
 }
